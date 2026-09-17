@@ -14,6 +14,7 @@ st.set_page_config(
     page_title="Dra. Aninha - Perícia Previdenciária",
     page_icon=AVATAR_ANINHA,
     layout="wide"
+    initial_sidebar_state="expanded"
 )
 
 # Cliente Gemini
