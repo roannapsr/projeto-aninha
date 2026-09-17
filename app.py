@@ -16,7 +16,22 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+st.markdown("""
+    <style>
+    /* Força a sidebar a ficar sempre visível com largura fixa */
+    section[data-testid="stSidebar"] {
+        width: 330px !important;
+        min-width: 330px !important;
+        transform: none !important;
+        visibility: visible !important;
+    }
+    /* Oculta os botões de fechar e reabrir da sidebar */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 # Cliente Gemini
 @st.cache_resource
 def get_client():
