@@ -1,5 +1,6 @@
 import os
 import time
+import docx
 import streamlit as st
 from dotenv import load_dotenv
 from google import genai
@@ -38,6 +39,14 @@ def get_client():
     return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 client = get_client()
+
+def extrair_texto_docx(arquivo):
+    doc = docx.Document(arquivo)
+    texto_completo = []
+    for paragrafo in doc.paragraphs:
+        if paragrafo.text.strip():
+            texto_completo.append(paragrafo.text)
+    return "\n".join(texto_completo)
 
 # Prompt especializado para perícia médica previdenciária
 SYSTEM_INSTRUCTION = """
@@ -157,16 +166,21 @@ if prompt_final:
             contents = []
             
             # Leitura de arquivos anexados
-            if uploaded_files:
-                for f in uploaded_files:
-                    bytes_data = f.read()
-                    mime = f.type
-                    if mime == "application/pdf":
-                        part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
-                        contents.append(part)
-                    elif mime in ["image/png", "image/jpeg", "image/jpg"]:
-                        part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
-                        contents.append(part)
+if uploaded_files:
+    for f in uploaded_files:
+        bytes_data = f.read()
+        mime = f.type
+
+        if mime == "application/pdf":
+            part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
+            contents.append(part)
+        elif mime in ["image/png", "image/jpeg", "image/jpg"]:
+            part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
+            contents.append(part)
+        elif f.name.endswith(".docx") or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            texto_docx = extrair_texto_docx(f)
+            if texto_docx.strip():
+                contents.append(f"\n[Conteúdo do arquivo anexado: {f.name}]\n{texto_docx}\n")
             
             # Histórico de contexto da conversa
             conversa_contexto = "HISTÓRICO PERICIAL DA SESSÃO ATÉ O MOMENTO:\n"
