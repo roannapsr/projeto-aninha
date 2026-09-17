@@ -13,7 +13,7 @@ AVATAR_ANINHA = "aninha.jpeg" if os.path.exists("aninha.jpeg") else "🩺"
 st.set_page_config(
     page_title="Dra. Aninha - Perícia Previdenciária",
     page_icon=AVATAR_ANINHA,
-    layout="wide"
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
