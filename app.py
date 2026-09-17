@@ -15,23 +15,31 @@ st.set_page_config(
     page_title="Dra. Aninha - Perícia Previdenciária",
     page_icon=AVATAR_ANINHA,
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 st.markdown("""
-    <style>
-    /* Força a sidebar a ficar sempre visível com largura fixa */
-    section[data-testid="stSidebar"] {
-        width: 330px !important;
-        min-width: 330px !important;
-        transform: none !important;
-        visibility: visible !important;
+<style>
+    /* No computador (telas maiores que 768px): esconde a setinha e trava a barra */
+    @media (min-width: 769px) {
+        [data-testid="stSidebarCollapseButton"] {
+            display: none !important;
+        }
+        [data-testid="stSidebarHeader"] {
+            display: none !important;
+        }
     }
-    /* Oculta os botões de fechar e reabrir da sidebar */
-    [data-testid="stSidebarCollapseButton"],
-    [data-testid="collapsedControl"] {
-        display: none !important;
+
+    /* No celular: permite recolher e dá espaço para o botão de fechar */
+    @media (max-width: 768px) {
+        [data-testid="stSidebarHeader"] {
+            display: flex !important;
+        }
     }
-    </style>
+
+    [data-testid="stSidebarUserContent"] {
+        padding-top: 0.8rem !important;
+    }
+</style>
 """, unsafe_allow_html=True)
 # Cliente Gemini
 @st.cache_resource
