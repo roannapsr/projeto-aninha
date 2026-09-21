@@ -1,5 +1,4 @@
 import os
-import time
 import streamlit as st
 from PIL import Image
 from dotenv import load_dotenv
@@ -11,13 +10,13 @@ from google.genai import types
 # ----------------------------------------------------
 load_dotenv()
 
-# Define o ícone da página com a imagem da Aninha (aba do navegador)
+# Ícone oficial da aba com a imagem da Aninha
 if os.path.exists("aninha.jpeg"):
     icone_aba = Image.open("aninha.jpeg")
 elif os.path.exists("aninha.png"):
     icone_aba = Image.open("aninha.png")
 else:
-    icone_aba = "👩‍⚕️" # Fallback caso a imagem não seja encontrada
+    icone_aba = "👩‍⚕️"
 
 st.set_page_config(
     page_title="Dra. Aninha - Perícia Médica Previdenciária",
@@ -44,7 +43,7 @@ st.markdown(
 )
 
 # ----------------------------------------------------
-# 2. Inicialização do Cliente Gemini e Instrução do Sistema
+# 2. Inicialização do Cliente Gemini e Instruções
 # ----------------------------------------------------
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
@@ -58,20 +57,24 @@ e respostas aos quesitos judiciais e das partes.
 
 Diretrizes:
 1. Mantenha tom estritamente técnico, formal, pericial e fundamentado na literatura médica e na legislação previdenciária (Lei 8.213/91).
-2. Sempre correlacione os achados clínicos e os exames de imagem/laboratoriais com a atividade profissional desempenhada pelo periciando.
+2. Sempre correlacione os achados clínicos e os exames com a atividade profissional do periciando.
 3. Não presuma incapacidade sem respaldo em elementos comprobatórios de limitação funcional para a função habitual.
 """
 
 # ----------------------------------------------------
-# 3. Gerenciamento do Estado da Sessão (Session State)
+# 3. Gerenciamento de Estado (Session State)
 # ----------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
 
 # ----------------------------------------------------
 # 4. Barra Lateral (Sidebar)
 # ----------------------------------------------------
 with st.sidebar:
+    # Avatar centralizado e proporcional
     col_v1, col_img, col_v2 = st.columns([1, 2, 1])
     with col_img:
         if os.path.exists("aninha.jpeg"):
@@ -81,32 +84,37 @@ with st.sidebar:
         else:
             st.markdown("<h1 style='text-align: center;'>👩‍⚕️</h1>", unsafe_allow_html=True)
 
+    # Botão de reiniciar: limpa histórico E esvazia os ficheiros anexados
     if st.button("🔄 Iniciar Novo Caso Pericial", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.uploader_key += 1
         st.rerun()
 
     st.markdown("---")
 
+    # Upload com chave dinâmica para esvaziar ao reiniciar
     st.markdown("### 📁 Anexar Documentos")
     arquivos_anexos = st.file_uploader(
         "Envie relatórios, exames ou autos (PDF ou Imagens):",
         type=["pdf", "png", "jpg", "jpeg"],
         accept_multiple_files=True,
-        help="Selecione um ou mais laudos/exames para análise técnica pericial."
+        key=f"uploader_{st.session_state.uploader_key}",
+        help="Selecione laudos ou exames para análise pericial técnica."
     )
 
     if arquivos_anexos:
-        st.info(f"📎 {len(arquivos_anexos)} documento(s) carregado(s).")
+        st.info(f"📎 {len(arquivos_anexos)} documento(s) anexado(s).")
 
     st.markdown("---")
 
+    # Ações Rápidas verticais
     st.markdown("### ⚡ Ações Rápidas")
     btn_laudo = st.button("🚀 Gerar Laudo", type="primary", use_container_width=True)
     btn_dii = st.button("🗓️ Fixar DII/DID", use_container_width=True)
-    btn_quesitos = st.button("⚖️ Responder Quesitos", use_container_width=True)
+    btn_quesitos = st.button("📋 Responder Quesitos", use_container_width=True)
 
 # ----------------------------------------------------
-# 5. Interface Principal (Header e Chat)
+# 5. Ecrã Principal
 # ----------------------------------------------------
 col_header_avatar, col_header_text = st.columns([1, 8], vertical_alignment="center")
 
@@ -124,22 +132,24 @@ with col_header_text:
 
 st.markdown("---")
 
+# Boas-vindas
 if not st.session_state.messages:
     with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
         st.markdown(
             "Olá, Doutor(a)! Sou a **Aninha**, sua assistente técnica em Perícia Previdenciária.\n\n"
-            "Você pode me ditar o histórico clínico, informar a profissão do periciando ou "
+            "Pode descrever o histórico clínico, informar a profissão do periciando ou "
             "**anexar relatórios e exames (PDF ou imagem)** na barra lateral para analisarmos "
-            "juntos a capacidade laborativa, fixação de DID/DII e respostas aos quesitos!"
+            "a capacidade laborativa, fixação de DID/DII e respostas aos quesitos."
         )
 
+# Histórico no ecrã
 for msg in st.session_state.messages:
     avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
     with st.chat_message(msg["role"], avatar=avatar_icon):
         st.markdown(msg["content"])
 
 # ----------------------------------------------------
-# 6. Processamento de Entradas (Chat ou Botões de Ação)
+# 6. Captura de Ações e Envio
 # ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite detalhes do periciando, exames, perguntas ou orientações...")
 
@@ -148,23 +158,21 @@ if prompt_usuario:
     prompt_acionado = prompt_usuario
 elif btn_laudo:
     prompt_acionado = (
-        "Com base em todo o caso pericial em discussão e nos documentos anexados, "
-        "elabore a minuta estruturada do Laudo Médico Pericial Judicial completo "
-        "(identificação, histórico clínico-ocupacional, análise crítica dos exames/laudos, "
-        "discussão técnica detalhada da capacidade laborativa, fixação fundamentada da DID e DII, "
-        "e conclusão pericial formal)."
+        "Com base em todo o caso pericial e nos documentos anexados, elabore a minuta "
+        "estruturada do Laudo Médico Pericial Judicial completo (identificação, histórico "
+        "clínico-ocupacional, análise crítica dos exames, discussão da capacidade "
+        "laborativa, fixação fundamentada da DID e DII, e conclusão pericial formal)."
     )
 elif btn_dii:
     prompt_acionado = (
         "Com base nos autos clínicos e relatórios apresentados, proceda à análise rigorosa "
-        "dos marcos temporais com base na Lei 8.213/91. Fixe e justifique detalhadamente a "
-        "DID (Data de Início da Doença) e a DII (Data de Início da Incapacidade), apontando os "
-        "documentos probatórios que sustentam cada marco."
+        "dos marcos temporais conforme a Lei 8.213/91. Fixe e fundamente a DID e a DII, "
+        "apontando os documentos que sustentam cada marco."
     )
 elif btn_quesitos:
     prompt_acionado = (
         "Com base nos documentos médicos e no histórico do caso, responda de forma técnica, "
-        "precisa e conclusiva aos quesitos periciais apresentados (do Juízo e das partes)."
+        "precisa e conclusiva aos quesitos periciais apresentados."
     )
 
 if prompt_acionado:
@@ -175,6 +183,7 @@ if prompt_acionado:
         with st.chat_message("user"):
             st.markdown(prompt_acionado)
 
+        # Montagem segura do payload para a IA
         contents = []
 
         if arquivos_anexos:
@@ -199,38 +208,27 @@ if prompt_acionado:
 
         historico_texto = "\n--- HISTÓRICO DA DISCUSSÃO PERICIAL ---\n"
         for m in st.session_state.messages[:-1]:
-            papel = "MÉDICO/USUÁRIO" if m["role"] == "user" else "DRA. ANINHA"
+            papel = "MÉDICO" if m["role"] == "user" else "DRA. ANINHA"
             historico_texto += f"{papel}: {m['content']}\n"
         historico_texto += f"\nNOVA DEMANDA:\n{prompt_acionado}"
         contents.append(historico_texto)
 
-        config_rapida = types.GenerateContentConfig(
+        config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             temperature=0.2
         )
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
-            max_tentativas = 4
-            resposta_sucesso = False
-
-            for tentativa in range(1, max_tentativas + 1):
-                try:
-                    response_stream = client.models.generate_content_stream(
-                        model="gemini-3.6-flash",
-                        contents=contents,
-                        config=config_rapida
-                    )
-                    resposta_completa = st.write_stream(
-                        chunk.text for chunk in response_stream if chunk.text
-                    )
-                    st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
-                    resposta_sucesso = True
-                    break
-                except Exception as err:
-                    erro_str = str(err)
-                    if "503" in erro_str and tentativa < max_tentativas:
-                        time.sleep(2.5 * tentativa)
-                        continue
-                    else:
-                        st.error(f"Erro na resposta: {err}")
-                        break
+            try:
+                # Modelo de produção estável e de baixa latência
+                response_stream = client.models.generate_content_stream(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                    config=config_ia
+                )
+                resposta_completa = st.write_stream(
+                    chunk.text for chunk in response_stream if chunk.text
+                )
+                st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
+            except Exception as err:
+                st.error(f"Erro na resposta: {err}")
