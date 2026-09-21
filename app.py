@@ -171,24 +171,24 @@ if prompt_final:
 
     with st.chat_message("assistant", avatar=AVATAR_ANINHA):
         with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
-contents = []
+            contents = []
             
             # Leitura de arquivos anexados
-if uploaded_files:
-    for f in uploaded_files:
-        bytes_data = f.read()
-        mime = f.type
+            if uploaded_files:
+                for f in uploaded_files:
+                    bytes_data = f.read()
+                    mime = f.type
 
-        if mime == "application/pdf":
-            part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
-            contents.append(part)
-        elif mime in ["image/png", "image/jpeg", "image/jpg"]:
-            part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
-            contents.append(part)
-        elif f.name.endswith(".docx") or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            texto_docx = extrair_texto_docx(f)
-            if texto_docx.strip():
-                contents.append(f"\n[Conteúdo do arquivo anexado: {f.name}]\n{texto_docx}\n")
+                    if mime == "application/pdf":
+                        part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
+                        contents.append(part)
+                    elif mime in ["image/png", "image/jpeg", "image/jpg"]:
+                        part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
+                        contents.append(part)
+                    elif f.name.endswith(".docx") or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                        texto_docx = extrair_texto_docx(f)
+                        if texto_docx.strip():
+                            contents.append(f"\n[Conteúdo do arquivo anexado: {f.name}]\n{texto_docx}\n")
             
             # Histórico de contexto da conversa
             conversa_contexto = "HISTÓRICO PERICIAL DA SESSÃO ATÉ O MOMENTO:\n"
