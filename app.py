@@ -207,13 +207,12 @@ if prompt_final:
             
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-3.6-flash",
                     contents=contents,
                     config=config_rapida
-                 )
+                )
                 resposta_texto = response.text
                 st.markdown(resposta_texto)
                 st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
             except Exception as err:
                 st.error(f"Erro na resposta: {err}")
-           
