@@ -222,7 +222,7 @@ if prompt_acionado:
             try:
                 # Modelo de produção estável e de baixa latência
                 response_stream = client.models.generate_content_stream(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.6-flash",
                     contents=contents,
                     config=config_ia
                 )
