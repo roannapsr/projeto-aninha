@@ -171,7 +171,7 @@ if prompt_final:
 
     with st.chat_message("assistant", avatar=AVATAR_ANINHA):
         with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
-            contents = []
+contents = []
             
             # Leitura de arquivos anexados
 if uploaded_files:
