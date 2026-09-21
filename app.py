@@ -1,6 +1,7 @@
 import os
 import time
 import streamlit as st
+from PIL import Image
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -10,9 +11,17 @@ from google.genai import types
 # ----------------------------------------------------
 load_dotenv()
 
+# Define o ícone da página com a imagem da Aninha (aba do navegador)
+if os.path.exists("aninha.jpeg"):
+    icone_aba = Image.open("aninha.jpeg")
+elif os.path.exists("aninha.png"):
+    icone_aba = Image.open("aninha.png")
+else:
+    icone_aba = "👩‍⚕️" # Fallback caso a imagem não seja encontrada
+
 st.set_page_config(
     page_title="Dra. Aninha - Perícia Médica Previdenciária",
-    page_icon="⚖️",
+    page_icon=icone_aba,
     layout="wide"
 )
 
@@ -201,7 +210,6 @@ if prompt_acionado:
         )
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
-            # Loop de tolerância a falhas para contornar instabilidade temporária (503)
             max_tentativas = 4
             resposta_sucesso = False
 
