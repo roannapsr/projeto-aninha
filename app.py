@@ -205,23 +205,30 @@ if prompt_final:
                 temperature=0.2
             )
 
+           # Modelos alternativos caso haja sobrecarga momentânea (503)
+            modelos_disponiveis = ["gemini-3.6-flash", "gemini-2.0-flash"]
+
             sucesso = False
-            for tentativa in range(3):
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-3.6-flash",
-                        contents=contents,
-                        config=config_rapida
-                    )
-                    resposta_texto = response.text
-                    st.markdown(resposta_texto)
-                    st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
-                    sucesso = True
-                    break
-                except Exception as err:
-                    if "503" in str(err) and tentativa < 2:
-                        time.sleep(2)
-                        continue
-                    st.error(f"Erro na geração da resposta: {err}")
+            for modelo_nome in modelos_disponiveis:
+                for tentativa in range(2):
+                    try:
+                        response = client.models.generate_content(
+                            model=modelo_nome,
+                            contents=contents,
+                            config=config_rapida
+                        )
+                        resposta_texto = response.text
+                        st.markdown(resposta_texto)
+                        st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
+                        sucesso = True
+                        break
+                    except Exception as err:
+                        if "503" in str(err) or "NOT_FOUND" in str(err):
+                            time.sleep(2)
+                            continue
+                        break
+                if sucesso:
                     break
 
+            if not sucesso:
+                st.error("Servidores do Google temporariamente indisponíveis. Por favor, tente novamente em instantes.")
