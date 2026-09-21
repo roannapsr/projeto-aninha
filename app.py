@@ -174,6 +174,7 @@ if prompt_final:
             contents = []
             
             # Leitura de arquivos anexados
+contents = []
 if uploaded_files:
     for f in uploaded_files:
         bytes_data = f.read()
