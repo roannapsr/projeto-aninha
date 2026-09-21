@@ -200,30 +200,28 @@ if uploaded_files:
             conversa_contexto += f"\nNOVA DEMANDA DA MÉDICA:\n{prompt_final}"
             contents.append(conversa_contexto)
             
-            # Configuração de alta velocidade e economia de tokens
-            config_rapida = types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=0.2,
-                thinking_config=types.ThinkingConfig(thinking_budget=0)
-            )
-            
-            sucesso = False
-            for tentativa in range(3):
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-3.6-flash",
-                        contents=contents,
-                        config=config_rapida
-                    )
-                    resposta_texto = response.text
-                    st.markdown(resposta_texto)
-                    st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
-                    sucesso = True
-                    break
-                except Exception as err:
-                    if "503" in str(err) and tentativa < 2:
-                        time.sleep(1.5)
-                        continue
-                    else:
-                        st.error(f"Instabilidade temporária nos servidores. Detalhes: {err}")
-                        break
+       # Configuração otimizada
+config_rapida = types.GenerateContentConfig(
+    system_instruction=SYSTEM_INSTRUCTION,
+    temperature=0.2
+)
+
+sucesso = False
+for tentativa in range(3):
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=config_rapida
+        )
+        resposta_texto = response.text
+        st.markdown(resposta_texto)
+        st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
+        sucesso = True
+        break
+    except Exception as err:
+        if "503" in str(err) and tentativa < 2:
+            time.sleep(2)
+            continue
+        st.error(f"Erro na geração da resposta: {err}")
+        break
