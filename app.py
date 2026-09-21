@@ -174,54 +174,54 @@ if prompt_final:
             contents = []
             
             # Leitura de arquivos anexados
-contents = []
-if uploaded_files:
-    for f in uploaded_files:
-        bytes_data = f.read()
-        mime = f.type
+            if uploaded_files:
+                for f in uploaded_files:
+                    bytes_data = f.read()
+                    mime = f.type
 
-        if mime == "application/pdf":
-            part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
-            contents.append(part)
-        elif mime in ["image/png", "image/jpeg", "image/jpg"]:
-            part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
-            contents.append(part)
-        elif f.name.endswith(".docx") or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            texto_docx = extrair_texto_docx(f)
-            if texto_docx.strip():
-                contents.append(f"\n[Conteúdo do arquivo anexado: {f.name}]\n{texto_docx}\n")
-            
-            # Histórico de contexto da conversa
+                    if mime == "application/pdf":
+                        part = types.Part.from_bytes(data=bytes_data, mime_type="application/pdf")
+                        contents.append(part)
+                    elif mime in ["image/png", "image/jpeg", "image/jpg"]:
+                        part = types.Part.from_bytes(data=bytes_data, mime_type=mime)
+                        contents.append(part)
+                    elif f.name.endswith(".docx") or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                        texto_docx = extrair_texto_docx(f)
+                        if texto_docx.strip():
+                            contents.append(f"\n[Conteúdo do arquivo anexado: {f.name}]\n{texto_docx}\n")
+
+            # 2. Histórico de contexto da conversa (alinhado com contents = [])
             conversa_contexto = "HISTÓRICO PERICIAL DA SESSÃO ATÉ O MOMENTO:\n"
             for m in st.session_state.messages[:-1]:
                 autor = "Médica Perita" if m["role"] == "user" else "Dra. Aninha"
                 conversa_contexto += f"{autor}: {m['content']}\n"
-            
+
             conversa_contexto += f"\nNOVA DEMANDA DA MÉDICA:\n{prompt_final}"
             contents.append(conversa_contexto)
-            
-       # Configuração otimizada
-config_rapida = types.GenerateContentConfig(
-    system_instruction=SYSTEM_INSTRUCTION,
-    temperature=0.2
-)
 
-sucesso = False
-for tentativa in range(3):
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=config_rapida
-        )
-        resposta_texto = response.text
-        st.markdown(resposta_texto)
-        st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
-        sucesso = True
-        break
-    except Exception as err:
-        if "503" in str(err) and tentativa < 2:
-            time.sleep(2)
-            continue
-        st.error(f"Erro na geração da resposta: {err}")
-        break
+            # 3. Chamada do modelo Gemini (alinhado com contents = [])
+            config_rapida = types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                temperature=0.2
+            )
+
+            sucesso = False
+            for tentativa in range(3):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=contents,
+                        config=config_rapida
+                    )
+                    resposta_texto = response.text
+                    st.markdown(resposta_texto)
+                    st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
+                    sucesso = True
+                    break
+                except Exception as err:
+                    if "503" in str(err) and tentativa < 2:
+                        time.sleep(2)
+                        continue
+                    st.error(f"Erro na geração da resposta: {err}")
+                    break
+
