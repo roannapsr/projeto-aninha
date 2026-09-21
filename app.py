@@ -204,7 +204,7 @@ if prompt_final:
                 system_instruction=SYSTEM_INSTRUCTION,
                 temperature=0.2
             )
-            
+        
             try:
                 response = client.models.generate_content(
                     model="gemini-3.6-flash",
