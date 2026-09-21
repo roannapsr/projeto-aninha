@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 from dotenv import load_dotenv
 from google import genai
@@ -15,11 +16,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS: Botão primário azul na barra lateral e ajustes visuais
+# Estilização CSS: Botão primário azul na barra lateral
 st.markdown(
     """
     <style>
-    /* Estiliza o botão principal (primary) para azul */
     section[data-testid="stSidebar"] button[kind="primary"] {
         background-color: #0d6efd !important;
         border-color: #0d6efd !important;
@@ -63,7 +63,6 @@ if "messages" not in st.session_state:
 # 4. Barra Lateral (Sidebar)
 # ----------------------------------------------------
 with st.sidebar:
-    # Avatar centralizado e ajustado
     col_v1, col_img, col_v2 = st.columns([1, 2, 1])
     with col_img:
         if os.path.exists("aninha.jpeg"):
@@ -73,14 +72,12 @@ with st.sidebar:
         else:
             st.markdown("<h1 style='text-align: center;'>👩‍⚕️</h1>", unsafe_allow_html=True)
 
-    # Botão de reiniciar caso
     if st.button("🔄 Iniciar Novo Caso Pericial", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
     st.markdown("---")
 
-    # Upload de Documentos Periciais
     st.markdown("### 📁 Anexar Documentos")
     arquivos_anexos = st.file_uploader(
         "Envie relatórios, exames ou autos (PDF ou Imagens):",
@@ -94,7 +91,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Ações Rápidas empilhadas verticalmente
     st.markdown("### ⚡ Ações Rápidas")
     btn_laudo = st.button("🚀 Gerar Laudo", type="primary", use_container_width=True)
     btn_dii = st.button("🗓️ Fixar DII/DID", use_container_width=True)
@@ -119,7 +115,6 @@ with col_header_text:
 
 st.markdown("---")
 
-# Mensagem inicial caso não haja histórico
 if not st.session_state.messages:
     with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
         st.markdown(
@@ -129,7 +124,6 @@ if not st.session_state.messages:
             "juntos a capacidade laborativa, fixação de DID/DII e respostas aos quesitos!"
         )
 
-# Renderiza histórico de mensagens existente
 for msg in st.session_state.messages:
     avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
     with st.chat_message(msg["role"], avatar=avatar_icon):
@@ -164,20 +158,16 @@ elif btn_quesitos:
         "precisa e conclusiva aos quesitos periciais apresentados (do Juízo e das partes)."
     )
 
-# Disparo da geração via Streaming
 if prompt_acionado:
     if not api_key:
         st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
     else:
-        # Registra e exibe a mensagem do usuário
         st.session_state.messages.append({"role": "user", "content": prompt_acionado})
         with st.chat_message("user"):
             st.markdown(prompt_acionado)
 
-        # Monta os conteúdos com contexto e anexos
         contents = []
 
-        # Adiciona arquivos anexos carregados
         if arquivos_anexos:
             for arq in arquivos_anexos:
                 tipo_mime = arq.type
@@ -198,7 +188,6 @@ if prompt_acionado:
                     )
                 )
 
-        # Adiciona o histórico recente da conversa como contexto textual
         historico_texto = "\n--- HISTÓRICO DA DISCUSSÃO PERICIAL ---\n"
         for m in st.session_state.messages[:-1]:
             papel = "MÉDICO/USUÁRIO" if m["role"] == "user" else "DRA. ANINHA"
@@ -206,23 +195,34 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{prompt_acionado}"
         contents.append(historico_texto)
 
-        # Configuração da chamada com instrução de sistema
         config_rapida = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             temperature=0.2
         )
 
-        # Resposta com streaming em tempo real
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
-            try:
-                response_stream = client.models.generate_content_stream(
-                    model="gemini-3.6-flash",
-                    contents=contents,
-                    config=config_rapida
-                )
-                resposta_completa = st.write_stream(
-                    chunk.text for chunk in response_stream if chunk.text
-                )
-                st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
-            except Exception as err:
-                st.error(f"Erro na geração da resposta: {err}")
+            # Loop de tolerância a falhas para contornar instabilidade temporária (503)
+            max_tentativas = 4
+            resposta_sucesso = False
+
+            for tentativa in range(1, max_tentativas + 1):
+                try:
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_rapida
+                    )
+                    resposta_completa = st.write_stream(
+                        chunk.text for chunk in response_stream if chunk.text
+                    )
+                    st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
+                    resposta_sucesso = True
+                    break
+                except Exception as err:
+                    erro_str = str(err)
+                    if "503" in erro_str and tentativa < max_tentativas:
+                        time.sleep(2.5 * tentativa)
+                        continue
+                    else:
+                        st.error(f"Erro na resposta: {err}")
+                        break
