@@ -1,12 +1,13 @@
 import os
 import io
-import time
+import re
 import streamlit as st
 from PIL import Image
 from dotenv import load_dotenv
 import docx
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from google import genai
 from google.genai import types
 
@@ -15,7 +16,7 @@ from google.genai import types
 # ----------------------------------------------------
 load_dotenv()
 
-# Ícone oficial da aba com a foto da Aninha
+# Ícone da aba do navegador (foto da Aninha)
 if os.path.exists("aninha.jpeg"):
     icone_aba = Image.open("aninha.jpeg")
 elif os.path.exists("aninha.png"):
@@ -54,63 +55,143 @@ api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
 SYSTEM_INSTRUCTION = """
-Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial de alto nível.
+Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial.
 Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11.395), Perita Judicial Federal da Seção Judiciária de Pernambuco (19ª Vara - TRF5).
 
-Ao elaborar o LAUDO PERICIAL, siga RIGOROSAMENTE e de forma padronizada a seguinte estrutura oficial:
+Ao redigir o LAUDO PERICIAL, siga rigorosamente a estrutura, termos e disposição formal abaixo, SEM UTILIZAR MARCADORES MARKDOWN DE ASTERISCOS (NÃO use ** no texto). Escreva o texto limpo com os títulos numerados em caixa alta:
 
 PODER JUDICIÁRIO DA UNIÃO
 TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO
 JUSTIÇA FEDERAL DE PRIMEIRA INSTÂNCIA
 SEÇÃO JUDICIÁRIA DE PERNAMBUCO - 19ª VARA
+
 LAUDO DE EXAME MÉDICO-PERICIAL
 
-1. PREÂMBULO (Processo nº, Ação, Órgão Julgador, Autor, Réu, Data da Perícia)
-2. PERÍCIA MÉDICA (Eu, Ana Paula da Costa Henriques, médica perita judicial...)
-3. DADOS DO(A) PERICIADO(A) (Nome, RG, CPF, Nascimento, Idade, Sexo biológico, Gênero, Escolaridade, Estado civil)
-4. HISTÓRICO LABORAL DO(A) PERICIADO(A) (Ocupação habitual, descrição detalhada da atividade e esforço biomecânico, tempo de exercício, data de afastamento, experiência anterior, reabilitação)
-5. HISTÓRICO / PATOLOGIAS ALEGADAS (CID alegados na inicial e documentos)
-6. HISTÓRICO DA DOENÇA ATUAL (HDA - cronologia dos sintomas, tratamentos realizados, uso de analgésicos/fisioterapia)
-7. EXAME CLÍNICO (Sinais vitais, Exame Geral, Aparelho Cardiorrespiratório, Exame Dermatológico, Aparelho Locomotor / Testes ortopédicos / neurológicos específicos)
-8. DOCUMENTOS AVALIADOS (Relação cronológica e análise crítica de atestados, laudos, exames complementares de imagem/laboratoriais)
-9. CONCLUSÃO PERICIAL:
-   - Data do Início da Doença (DID) fundamentada
-   - Data do Início da Incapacidade (DII) fundamentada
-   - Síntese técnico-científica e fundamentação pericial
-   - Tabela / Quadro pericial: Patologia | CID-10 | Enquadramento Pericial e Fundamentação Técnica
-   - Conclusões diagnósticas e Esclarecimentos
-   - Incapacidade (Ausente / Temporária / Permanente / Parcial / Total / Não se aplica)
-10. QUESITOS DO JUÍZO:
-   - Responda objetiva e fundamentadamente aos quesitos de 1 a 19 do QUADRO I (Quesitação Padrão do Juízo).
-   - Indique 'Não se aplicam' para os Quadros II, III e IV se for o caso.
-   - Quadro V: 'Ver conclusão pericial'.
-11. ENCERRAMENTO E ASSINATURA:
-   Recife, [Data atual].
-   ANA PAULA DA COSTA HENRIQUES
-   Médica Perita - CRM-PE 11.395
+1. PREÂMBULO
+Processo nº:
+Ação:
+Órgão Julgador:
+Autor:
+Réu:
+Data da Perícia:
 
-Diretrizes Técnicas:
-- Fundamente com base na Lei 8.213/91 e na biomecânica da ocupação habitual.
-- Nunca afirme incapacidade sem evidência de limitação funcional demonstrada documentalmente ou no exame físico.
+2. PERÍCIA MÉDICA
+Eu, Ana Paula da Costa Henriques, médico (CRM-PE 11.395), perito judicial nos autos do Processo abaixo discriminado, tendo realizado os levantamentos e pesquisas julgadas necessárias, venho apresentar o meu LAUDO PERICIAL.
+
+3. DADOS DO(A) PERICIADO(A)
+Nome: 
+Identidade civil: 
+CPF: 
+Data do nascimento: 
+Idade: 
+Sexo biológico: 
+Identidade de gênero: 
+Escolaridade: 
+Estado civil: 
+
+4. HISTÓRICO LABORAL DO(A) PERICIADO(A)
+Ocupação habitual: 
+Descrição da atividade: 
+Tempo de exercício da ocupação habitual: 
+Data declarada de afastamento do trabalho: 
+Experiência laboral anterior: 
+Formação técnico-profissional: 
+Reabilitação profissional: 
+
+5. HISTÓRICO
+Da análise da petição inicial e dos documentos apresentados, depreende-se que o(a) periciado(a) estaria acometido pela(s) seguinte(s) patologia(s) - CID: 
+
+6. HISTÓRICO DA DOENÇA ATUAL
+
+7. EXAME CLÍNICO
+Sinais Vitais: PA: [X] mmHg. FC: [X] bpm.
+Exame Geral: 
+Aparelho Cardiorrespiratório: 
+Exame Dermatológico: 
+Aparelho Locomotor: 
+
+8. DOCUMENTOS AVALIADOS
+(Listar em ordem cronológica de forma crítica os atestados, laudos e exames de imagem)
+
+9. CONCLUSÃO PERICIAL
+Data do Início da Doença (DID): 
+Data do Início da Incapacidade (DII): 
+O conjunto de patologias referenciado nos documentos médicos e administrativos juntados aos autos foi integralmente considerado no âmbito desta perícia, conduzida segundo protocolo técnico-científico próprio da medicina pericial. O procedimento adotado observou as seguintes etapas: identificação da demanda judicial e de seu objeto; levantamento e qualificação do periciado; coleta dos dados específicos da perícia; mapeamento das enfermidades alegadas e de sua evolução clínica; realização de anamnese e exame físico e/ou mental; apreciação crítica de atestados, laudos, exames complementares e documentos administrativos; cotejo com perícias anteriores eventualmente existentes; síntese integrativa de todos os elementos colhidos; e elaboração das respostas técnicas aos quesitos formulados pelo Juízo e pelas partes.
+
+Patologia / Condição Clínica | CID-10 | Enquadramento Pericial e Fundamentação Técnica
+(Preencher os enquadramentos periciais)
+
+Conclusões diagnósticas: 
+Esclarecimentos: 
+Incapacidade: 
+
+10. QUESITOS DO JUÍZO
+QUADRO I – QUESITAÇÃO PADRÃO
+1. O Autor foi devidamente identificado por meio de documento original com foto e submetido a exame clínico completo?
+2. O periciando é ou já foi paciente do ilustre perito?
+3. Qual a profissão declarada pelo periciando? Caso esteja desempregado, qual a última atividade exercida pelo periciando?
+4. Quais profissões o periciando declara já ter desempenhado?
+5. Os dados objetivos do exame físico estão em correspondência com as queixas apresentadas?
+6. O periciando é portador de alguma doença, sequela ou deficiência? Quais? Indicar exames em que se baseia.
+7. A doença, deficiência física ou mental, anomalia ou lesão de que o periciando é portador incapacita para o exercício de atividade laborativa? Quais elementos levaram à convicção pericial? Tal incapacidade é temporária ou definitiva?
+8. É possível afirmar se a incapacidade do periciando foi intermitente? Com base em que se afirma isso?
+9. Caso exista apenas incapacidade temporária, a doença ou sequela incapacita a parte autora para seu trabalho ou atividade habitual por mais de 15 dias?
+10. Caso a incapacidade seja temporária, qual o prazo ideal para tratamento, ainda que por estimativa, durante o qual o periciando não poderia trabalhar na sua atividade habitual?
+11. O tempo estimado de recuperação é de dois anos, contados a partir da data de início da incapacidade/impedimento?
+12. O quadro do periciado é progressivo, regressivo ou estável? Justifique.
+13. Tal incapacidade inviabiliza o exercício de toda atividade laborativa (incapacidade total) ou apenas de algumas atividades laborativas (incapacidade parcial)?
+14. Esclareça o perito, caso a incapacidade seja parcial, se o periciando pode exercer a atividade que habitualmente executa/executou, indicando, caso negativo, as atividades que poderá desempenhar, levando em conta o grau de escolaridade, idade e as condições sócio-econômicas.
+15. A incapacidade decorreu de progressão ou agravamento de doença ou lesão da qual o periciado já era portador? Justifique.
+16. Há incapacidade para o desempenho das atividades da vida independente? Ou seja, o periciando é capaz para realizar as atividades da vida diária (banhar-se, vestir-se, pentear-se, comer, passear etc.) independentemente da ajuda de terceiros?
+17. O periciando é incapaz para o desempenho dos atos da vida civil? Parcial ou totalmente?
+18. O periciando está acometido de tuberculose ativa, hanseníase, alienação mental, neoplasia maligna, cegueira, paralisia irreversível incapacitante, cardiopatia grave, doença de Parkinson, espondiloartrose anquilosante, nefropatia grave, estado avançado de doença Paget, AIDS, contaminação por radiação e/ou hepatopatia grave?
+19. É necessário que o periciando faça uso constante de medicação? Em caso affirmativo, a medicação é fornecida pelo Sistema Único de Saúde – SUS?
+QUADRO II – QUESITOS ESPECÍFICOS PARA AUXÍLIO-DOENÇA E/OU APOSENTADORIA POR INVALIDEZ – Não se aplicam
+QUADRO III – QUESITOS ESPECÍFICOS PARA PERICIANDO MENORES DE 16 ANOS – Não se aplicam
+QUESITIOS IV – QUESITOS ESPECÍFICOS PARA PORTADORES DA SÍNDROME DA IMUNODEFICIÊNCIA ADQUIRIDA – Não se aplicam
+QUADRO V – CONSIDERAÇÕES (AVALIAÇÃO FUNCIONAL POR DOMÍNIOS)
+Preste o senhor Perito os esclarecimentos adicionais que considerar necessários. Os esclarecimentos devem ser elaborados de forma clara e com linguagem acessível aos leigos (juiz, advogados e partes).
+Ver conclusão pericial
+
+11. ANEXOS (Fotos e Laudo da perícia trazidas pelo periciando(a))
+
+ANA PAULA DA COSTA HENRIQUES
+Médica Perita - CRM-PE 11.395
 """
 
 # ----------------------------------------------------
-# 3. Função para Gerar Arquivo .DOCX
+# 3. Função para Gerar Arquivo .DOCX Formatado
 # ----------------------------------------------------
 def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     doc = docx.Document()
 
-    # Configuração das margens (padrão 2cm)
+    # Configuração das margens (2 cm)
     for section in doc.sections:
         section.top_margin = Inches(0.8)
         section.bottom_margin = Inches(0.8)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
 
-    # Cabeçalho Principal Centralizado
-    p_cabecalho = doc.add_paragraph()
-    p_cabecalho.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_cab = p_cabecalho.add_run(
+    # Inserção do Brasão no topo se o arquivo existir
+    brasao_arquivo = None
+    for nome_b in ["brasao.png", "brasao.jpg", "brasao.jpeg", "logo.png"]:
+        if os.path.exists(nome_b):
+            brasao_arquivo = nome_b
+            break
+
+    if brasao_arquivo:
+        p_logo = doc.add_paragraph()
+        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_logo.paragraph_format.space_after = Pt(2)
+        run_logo = p_logo.add_run()
+        run_logo.add_picture(brasao_arquivo, width=Inches(1.1))
+
+    # Cabeçalho Oficial Centralizado
+    p_cab = doc.add_paragraph()
+    p_cab.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_cab.paragraph_format.space_after = Pt(12)
+    p_cab.paragraph_format.line_spacing = 1.15
+    run_cab = p_cab.add_run(
         "PODER JUDICIÁRIO DA UNIÃO\n"
         "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO\n"
         "JUSTIÇA FEDERAL DE PRIMEIRA INSTÂNCIA\n"
@@ -120,40 +201,86 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     run_cab.bold = True
     run_cab.font.size = Pt(11)
 
-    # Processamento do texto linha a linha
-    linhas = texto_laudo.split("\n")
-    for linha in linhas:
-        l_strip = linha.strip()
-        if not l_strip:
+    # Remove os asteriscos (**) que causam poluição visual
+    texto_limpo = texto_laudo.replace("**", "").replace("###", "").replace("##", "")
+
+    linhas = texto_limpo.split("\n")
+    i = 0
+    while i < len(linhas):
+        linha = linhas[i].strip()
+        if not linha:
+            i += 1
+            continue
+
+        # Se a linha for linha de tabela (contém '|')
+        if "|" in linha and not linha.startswith("#"):
+            linhas_tabela = []
+            while i < len(linhas) and "|" in linhas[i]:
+                l_tab = linhas[i].strip()
+                # Ignora linha de separação como |---|---|
+                if not re.match(r"^\|?[\s\-:|]+\|?$", l_tab):
+                    colunas = [c.strip() for c in l_tab.strip("|").split("|")]
+                    if any(colunas):
+                        linhas_tabela.append(colunas)
+                i += 1
+
+            if linhas_tabela:
+                num_cols = max(len(r) for r in linhas_tabela)
+                table = doc.add_table(rows=len(linhas_tabela), cols=num_cols)
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.style = "Table Grid"
+
+                for r_idx, row_data in enumerate(linhas_tabela):
+                    for c_idx, cell_value in enumerate(row_data):
+                        if c_idx < num_cols:
+                            cell = table.cell(r_idx, c_idx)
+                            cell.text = cell_value
+                            if r_idx == 0:
+                                for p_c in cell.paragraphs:
+                                    for r_c in p_c.runs:
+                                        r_c.bold = True
+                p_espaco = doc.add_paragraph()
+                p_espaco.paragraph_format.space_before = Pt(4)
             continue
 
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.15
-        p.paragraph_format.space_after = Pt(4)
+        p.paragraph_format.space_after = Pt(3)
 
-        # Detecta se é título de seção (ex: 1. PREÂMBULO, 9. CONCLUSÃO)
-        eh_secao = any(l_strip.startswith(f"{i}.") for i in range(1, 13)) or l_strip.startswith("QUADRO")
+        # Detecta se é título de seção (1. PREÂMBULO, etc.)
+        eh_secao = any(linha.startswith(f"{n}.") for n in range(1, 13)) or linha.startswith("QUADRO")
 
-        if eh_secao or l_strip.startswith("#"):
-            run = p.add_run(l_strip.replace("#", "").strip())
-            run.bold = True
-            run.font.size = Pt(11)
+        if eh_secao:
             p.paragraph_format.space_before = Pt(8)
+            run = p.add_run(linha)
+            run.bold = True
+            run.font.size = Pt(10.5)
         else:
-            run = p.add_run(l_strip)
-            run.font.size = Pt(10)
+            # Se for linha de campo (ex: "Processo nº: ...") coloca o rótulo em negrito
+            if ":" in linha and len(linha.split(":", 1)[0]) < 40:
+                rotulo, valor = linha.split(":", 1)
+                run_r = p.add_run(rotulo + ":")
+                run_r.bold = True
+                run_r.font.size = Pt(10)
+                run_v = p.add_run(valor)
+                run_v.font.size = Pt(10)
+            else:
+                run = p.add_run(linha)
+                run.font.size = Pt(10)
 
-    # Rodapé / Assinatura
-    p_rodape = doc.add_paragraph()
-    p_rodape.paragraph_format.space_before = Pt(20)
-    p_rodape.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_rod = p_rodape.add_run(
-        "\n_________________________________________________\n"
+        i += 1
+
+    # Assinatura Oficial da Perita
+    p_assinatura = doc.add_paragraph()
+    p_assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_assinatura.paragraph_format.space_before = Pt(24)
+    run_ass = p_assinatura.add_run(
         "ANA PAULA DA COSTA HENRIQUES\n"
-        "Médica Perita - CRM-PE 11.395"
+        "Médica Perita - CRM-PE 11.395\n"
+        "Assinatura Eletrônica"
     )
-    run_rod.bold = True
-    run_rod.font.size = Pt(10)
+    run_ass.bold = True
+    run_ass.font.size = Pt(10)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -185,7 +312,6 @@ with st.sidebar:
         else:
             st.markdown("<h1 style='text-align: center;'>👩‍⚕️</h1>", unsafe_allow_html=True)
 
-    # Reiniciar caso
     if st.button("🔄 Iniciar Novo Caso Pericial", use_container_width=True):
         st.session_state.messages = []
         st.session_state.ultimo_laudo_gerado = ""
@@ -194,14 +320,13 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Upload com suporte a DOCX, PDF e Imagens
     st.markdown("### 📁 Anexar Documentos")
     arquivos_anexos = st.file_uploader(
         "Envie relatórios, exames ou autos (Word, PDF, Imagens):",
         type=["pdf", "docx", "png", "jpg", "jpeg"],
         accept_multiple_files=True,
         key=f"uploader_{st.session_state.uploader_key}",
-        help="Selecione os documentos do caso pericial."
+        help="Selecione os documentos para análise pericial técnica."
     )
 
     if arquivos_anexos:
@@ -209,13 +334,11 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Ações Rápidas
     st.markdown("### ⚡ Ações Rápidas")
     btn_laudo = st.button("🚀 Gerar Laudo Completo", type="primary", use_container_width=True)
     btn_dii = st.button("🗓️ Fixar DII/DID", use_container_width=True)
     btn_quesitos = st.button("📋 Responder Quesitos", use_container_width=True)
 
-    # Exibe o botão de baixar Word se houver laudo gerado
     if st.session_state.ultimo_laudo_gerado:
         st.markdown("---")
         st.markdown("### 💾 Exportar Laudo")
@@ -251,9 +374,9 @@ if not st.session_state.messages:
     with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
         st.markdown(
             "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
-            "Estou configurada com o padrão oficial do seu **Laudo Pericial (TRF5 - 19ª Vara)**. "
-            "Pode ditar os dados do caso, ou anexar os laudos e autos em **Word (.docx), PDF ou Imagem** "
-            "na barra lateral e clicar em **🚀 Gerar Laudo Completo** para redigir o laudo e disponibilizar o arquivo `.docx` para download!"
+            "Estou pronta com o padrão oficial do **TRF5 (19ª Vara)**. "
+            "Pode ditar os elementos do periciando ou anexar os autos em **Word (.docx), PDF ou Imagem** "
+            "na barra lateral e clicar em **🚀 Gerar Laudo Completo** para redigir o laudo e disponibilizar o arquivo `.docx` com brasão e formatação limpa!"
         )
 
 for msg in st.session_state.messages:
@@ -262,7 +385,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # ----------------------------------------------------
-# 7. Processamento e Streaming
+# 7. Processamento, Spinner e Streaming
 # ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
 
@@ -274,12 +397,10 @@ if prompt_usuario:
 elif btn_laudo:
     eh_pedido_laudo = True
     prompt_acionado = (
-        "Com base em todos os documentos anexados e nos fatos informados, elabore a minuta completa "
-        "do LAUDO DE EXAME MÉDICO-PERICIAL oficial, preenchendo todos os 11 itens: Preâmbulo, Perícia Médica, "
-        "Dados do Periciado, Histórico Laboral com esforço biomecânico, Histórico de Patologias (CID), "
-        "Histórico da Doença Atual (HDA), Exame Clínico, Documentos Avaliados em ordem cronológica, "
-        "Conclusão Pericial com fundamentação técnica de DID/DII e tabela comparativa, respostas a todos os "
-        "19 quesitos do Quadro I do Juízo, e o encerramento com assinatura da Dra. Ana Paula da Costa Henriques."
+        "Com base em todos os documentos anexados e nos dados do caso, elabore o LAUDO DE EXAME MÉDICO-PERICIAL "
+        "completo da 19ª Vara / TRF5, preenchendo todos os 11 itens oficiais sem marcadores de asteriscos (**), "
+        "com fundamentação de DID e DII, o quadro comparativo de patologias, respostas completas aos 19 quesitos "
+        "do Juízo e encerramento em nome da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)."
     )
 elif btn_dii:
     prompt_acionado = (
@@ -291,7 +412,7 @@ elif btn_dii:
 elif btn_quesitos:
     prompt_acionado = (
         "Com base nos documentos médicos e no histórico do caso, responda de forma técnica, "
-        "precisa e conclusiva a todos os 19 quesitos padrão do Quadro I do Juízo da 19ª Vara."
+        "precisa e conclusiva aos 19 quesitos padrão do Quadro I do Juízo da 19ª Vara."
     )
 
 if prompt_acionado:
@@ -305,13 +426,11 @@ if prompt_acionado:
         contents = []
         texto_documentos_docx = ""
 
-        # Processamento inteligente de anexos
         if arquivos_anexos:
             for arq in arquivos_anexos:
                 nome_baixo = arq.name.lower()
                 dados_arquivo = arq.getvalue()
 
-                # Se for Word (.docx), extrai o texto diretamente
                 if nome_baixo.endswith(".docx"):
                     try:
                         doc = docx.Document(io.BytesIO(dados_arquivo))
@@ -320,8 +439,6 @@ if prompt_acionado:
                         texto_documentos_docx += f"\n\n--- DOCUMENTO WORD ANEXADO: {arq.name} ---\n{texto_extraido}\n"
                     except Exception as e_docx:
                         st.warning(f"Não foi possível ler o texto do arquivo {arq.name}: {e_docx}")
-
-                # Se for PDF
                 elif nome_baixo.endswith(".pdf"):
                     contents.append(
                         types.Part.from_bytes(
@@ -329,7 +446,6 @@ if prompt_acionado:
                             mime_type="application/pdf"
                         )
                     )
-                # Se for imagem
                 elif nome_baixo.endswith((".png", ".jpg", ".jpeg")):
                     mime = "image/png" if nome_baixo.endswith(".png") else "image/jpeg"
                     contents.append(
@@ -339,7 +455,6 @@ if prompt_acionado:
                         )
                     )
 
-        # Contexto da conversa
         historico_texto = "\n--- HISTÓRICO DA DISCUSSÃO PERICIAL ---\n"
         for m in st.session_state.messages[:-1]:
             papel = "MÉDICO" if m["role"] == "user" else "DRA. ANINHA"
@@ -357,17 +472,21 @@ if prompt_acionado:
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
             try:
-                response_stream = client.models.generate_content_stream(
-                    model="gemini-3.6-flash",
-                    contents=contents,
-                    config=config_ia
-                )
+                # O spinner é exibido enquanto o Gemini processa a resposta
+                with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_ia
+                    )
+
+                # O streaming ocorre em tempo real
                 resposta_completa = st.write_stream(
                     chunk.text for chunk in response_stream if chunk.text
                 )
                 st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
 
-                # Se foi gerado um laudo (ou se a resposta contém a estrutura pericial), disponibiliza para download
+                # Se foi gerado um laudo, disponibiliza o download em .docx
                 if eh_pedido_laudo or "LAUDO DE EXAME MÉDICO-PERICIAL" in resposta_completa or "PREÂMBULO" in resposta_completa:
                     st.session_state.ultimo_laudo_gerado = resposta_completa
                     doc_buf = gerar_docx_do_laudo(resposta_completa)
