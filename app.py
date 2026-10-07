@@ -58,9 +58,14 @@ Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11
 
 COMPORTAMENTO EM CONVERSAS E ANÁLISES (CHAT COMUM):
 - Quando a médica enviar dados do periciando, resumos ou fizer perguntas, atue como colega perita consultora.
-- Analise criticamente os fatos, aponte a correlação biomecânica com a profissão habitual, discuta a existência ou não de incapacidade laborativa (temporária, total/parcial), sugira marcos de DID e DII e discuta a fundamentação conforme a Lei 8.213/91.
-- Responda de forma clara, direta e técnica no chat. NÃO gere a minuta formal de 11 tópicos a menos que seja explicitamente solicitado o laudo completo pelo botão oficial.
+- Responda ESTRITAMENTE ao que foi solicitado na demanda atual. Não desvie de assunto nem responda quesitos ou tópicos não solicitados.
 - Mantenha títulos e destaques sempre em negrito para facilitar a leitura.
+
+AO FIXAR MARCOS TEMPORAIS (DID e DII):
+- Foque EXCLUSIVAMENTE na análise da DID (Data de Início da Doença) e da DII (Data de Início da Incapacidade).
+- NÃO responda quesitos do juízo.
+- NÃO gere a minuta de laudo completo.
+- Fundamente tecnicamente a correlação clínico-documental com base na Lei 8.213/91, detalhando qual exame ou relatório comprova cada marco e a biomecânica da função.
 
 AO RESPONDER AOS QUESITOS DO JUÍZO:
 - Identifique cada quesito em negrito com seu tema (ex: **Quesito 1 - Identificação:**, **Quesito 7 - Incapacidade laborativa:**, etc.) e forneça a resposta técnica pericial fundamentada logo abaixo.
@@ -416,13 +421,20 @@ elif btn_laudo:
         "e finalizando com o encerramento formal da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)."
     )
 elif btn_dii:
+    eh_pedido_laudo = False
     prompt_acionado = (
-        "Com base nos autos clínicos e relatórios apresentados, proceda à análise rigorosa "
-        "dos marcos temporais conforme a Lei 8.213/91. Fixe e justifique detalhadamente a "
-        "DID (Data de Início da Doença) e a DII (Data de Início da Incapacidade), apontando os "
-        "documentos probatórios que sustentam cada marco."
+        "Atenção: sua tarefa agora é EXCLUSIVAMENTE a fixação e fundamentação dos marcos temporais periciais "
+        "(DID e DII). NÃO responda quesitos judiciais e NÃO elabore tópicos do laudo.\n\n"
+        "Proceda à análise médico-pericial com foco nos seguintes pontos:\n"
+        "1. **Data de Início da Doença (DID)**: Data exata sugerida e qual o documento médico comprobatório inaugural.\n"
+        "2. **Data de Início da Incapacidade (DII)**: Data exata sugerida, fundamentada no exame de imagem/relatório "
+        "que comprova a perda da capacidade laborativa para a profissão habitual.\n"
+        "3. **Fundamentação Técnica e Legal**: Correlação biomecânica com as exigências da atividade habitual "
+        "e enquadramento conforme a Lei 8.213/91.\n"
+        "4. **Prazo Estimado de Recuperação / Prognóstico**: Estimativa em meses/dias para reabilitação ou tratamento."
     )
 elif btn_quesitos:
+    eh_pedido_laudo = False
     prompt_acionado = (
         "Com base nos documentos médicos e no histórico do caso, responda aos 19 quesitos padrão do Juízo "
         "(Quadro I da 19ª Vara). Apresente cada item no formato: '**Quesito [Número] - [Tema]:**' seguido da resposta "
@@ -513,7 +525,6 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
         contents.append(historico_texto)
 
-        # Configuração estável com max_output_tokens=8192 (limite máximo suportado) e thinking=0
         config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             max_output_tokens=8192,
@@ -525,7 +536,7 @@ if prompt_acionado:
             try:
                 # 1. BOTÃO GERAR LAUDO: Coleta via stream em segundo plano para máxima confiabilidade
                 if eh_pedido_laudo:
-                    status_box.info("⏳ Só um momento, Dra Aninha está gerando o laudo solicitado...")
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     
                     stream_laudo = client.models.generate_content_stream(
                         model="gemini-3.6-flash",
@@ -567,9 +578,9 @@ if prompt_acionado:
                             "key_id": len(st.session_state.messages)
                         })
 
-                # 2. CHAT / DISCUSSÃO: Streaming em tempo real
+                # 2. CHAT / DISCUSSÃO / MARCOS / QUESITOS: Streaming em tempo real
                 else:
-                    status_box.info("⏳ Só um momento, Dra Aninha responderá em breve...")
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     response_stream = client.models.generate_content_stream(
                         model="gemini-3.6-flash",
                         contents=contents,
