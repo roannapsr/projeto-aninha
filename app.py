@@ -475,4 +475,228 @@ with st.sidebar:
             label="📥 Baixar Laudo em Word (.docx)",
             data=docx_buffer,
             file_name=nome_arquivo_doc,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+
+# ----------------------------------------------------
+# 6. Captura de Entrada e Gerenciamento do Fluxo
+# ----------------------------------------------------
+col_header_avatar, col_header_text = st.columns([1, 8], vertical_alignment="center")
+
+with col_header_avatar:
+    if os.path.exists("aninha.jpeg"):
+        st.image("aninha.jpeg", width=75)
+    elif os.path.exists("aninha.png"):
+        st.image("aninha.png", width=75)
+    else:
+        st.markdown("## 👩‍⚕️")
+
+with col_header_text:
+    st.markdown("## Dra. Aninha — Assistente de Perícia Previdenciária")
+    st.caption("Padrão Oficial TRF5 / 19ª Vara — Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)")
+
+st.markdown("---")
+
+prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
+
+prompt_acionado = None
+eh_pedido_laudo = False
+
+if prompt_usuario:
+    prompt_acionado = prompt_usuario
+    eh_pedido_laudo = False
+elif btn_laudo:
+    eh_pedido_laudo = True
+    prompt_acionado = (
+        "Elabore a minuta completa do LAUDO DE EXAME MÉDICO-PERICIAL oficial da 19ª Vara / TRF5, "
+        "com base estritamente nos documentos anexados e nos fatos informados na discussão. "
+        "Comece DIRETAMENTE pelo cabeçalho institucional (PODER JUDICIÁRIO DA UNIÃO), sem mensagens prévias. "
+        "Mantenha os títulos das seções em negrito. "
+        "Preencha todos os 11 itens oficiais, fundamentando DID e DII, o quadro comparativo de patologias, "
+        "respondendo obrigatoriamente a todos os 19 quesitos do Juízo do 1 ao 19 com fundamentação técnica "
+        f"e finalizando com o encerramento formal da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395) datado com '{DATA_ATUAL_EXTENSO}'."
+    )
+elif btn_dii:
+    eh_pedido_laudo = False
+    prompt_acionado = (
+        "Atenção: sua tarefa agora é EXCLUSIVAMENTE a fixação e fundamentação dos marcos temporais periciais "
+        "(DID e DII). NÃO responda quesitos judiciais e NÃO elabore tópicos do laudo.\n\n"
+        "Proceda à análise médico-pericial com foco nos seguintes pontos:\n"
+        "1. **Data de Início da Doença (DID)**: Data exata sugerida e qual o documento médico comprobatório inaugural.\n"
+        "2. **Data de Início da Incapacidade (DII)**: Data exata sugerida, fundamentada no exame de imagem/relatório "
+        "que comprova a perda da capacidade laborativa para a profissão habitual.\n"
+        "3. **Fundamentação Técnica e Legal**: Correlação biomecânica com as exigências da atividade habitual "
+        "e enquadramento conforme a Lei 8.213/91.\n"
+        "4. **Prazo Estimado de Recuperação / Prognóstico**: Estimativa em meses/dias para reabilitação ou tratamento."
+    )
+elif btn_quesitos:
+    eh_pedido_laudo = False
+    prompt_acionado = (
+        "Com base nos documentos médicos e no histórico do caso, responda aos 19 quesitos padrão do Juízo "
+        "(Quadro I da 19ª Vara). Apresente cada item no formato: '**Quesito [Número] - [Tema]:**' seguido da resposta "
+        "técnica pericial fundamentada. Responda a todos os 19 quesitos, do 1 ao 19, de forma completa."
+    )
+
+if prompt_acionado:
+    texto_card_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
+    st.session_state.messages.append({"role": "user", "content": texto_card_usuario})
+
+if not st.session_state.messages:
+    with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
+        st.markdown(
+            "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
+            "Envie os dados do caso no chat ou anexe os documentos na barra lateral para analisarmos. "
+            "Quando desejar formalizar a minuta oficial, basta clicar em **🚀 Gerar Laudo Completo**!"
+        )
+
+for msg in st.session_state.messages:
+    avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar_icon):
+        st.markdown(msg["content"])
+        if msg.get("is_laudo_card", False) and st.session_state.ultimo_laudo_gerado:
+            doc_buf_msg = gerar_docx_do_laudo(st.session_state.ultimo_laudo_gerado)
+            nome_doc_msg = extrair_nome_arquivo_laudo(st.session_state.ultimo_laudo_gerado)
+            st.download_button(
+                label="📥 Baixar Laudo em Word (.docx)",
+                data=doc_buf_msg,
+                file_name=nome_doc_msg,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"dl_history_{msg.get('key_id', 0)}"
+            )
+
+# ----------------------------------------------------
+# 7. Execução da IA
+# ----------------------------------------------------
+if prompt_acionado:
+    if not api_key:
+        st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
+    else:
+        contents = []
+        texto_documentos_docx = ""
+
+        if arquivos_anexos:
+            for arq in arquivos_anexos:
+                nome_baixo = arq.name.lower()
+                dados_arquivo = arq.getvalue()
+
+                if nome_baixo.endswith(".docx"):
+                    try:
+                        doc = docx.Document(io.BytesIO(dados_arquivo))
+                        paragrafos = [p.text for p in doc.paragraphs if p.text.strip()]
+                        texto_extraido = "\n".join(paragrafos)
+                        texto_documentos_docx += f"\n\n--- DOCUMENTO WORD ANEXADO: {arq.name} ---\n{texto_extraido}\n"
+                    except Exception as e_docx:
+                        st.warning(f"Não foi possível ler o texto do arquivo {arq.name}: {e_docx}")
+                elif nome_baixo.endswith(".pdf"):
+                    contents.append(
+                        types.Part.from_bytes(
+                            data=dados_arquivo,
+                            mime_type="application/pdf"
+                        )
+                    )
+                elif nome_baixo.endswith((".png", ".jpg", ".jpeg")):
+                    mime = "image/png" if nome_baixo.endswith(".png") else "image/jpeg"
+                    contents.append(
+                        types.Part.from_bytes(
+                            data=dados_arquivo,
+                            mime_type=mime
+                        )
+                    )
+
+        historico_texto = "\n--- HISTÓRICO DA DISCUSSÃO PERICIAL ---\n"
+        for m in st.session_state.messages[:-1]:
+            papel = "MÉDICO" if m["role"] == "user" else "DRA. ANINHA"
+            historico_texto += f"{papel}: {m['content']}\n"
+
+        if texto_documentos_docx:
+            historico_texto += f"\nCONTEÚDO EXTRAÍDO DOS ARQUIVOS WORD:\n{texto_documentos_docx}\n"
+
+        if eh_pedido_laudo:
+            demanda_final = (
+                f"{prompt_acionado}\n\n[INSTRUÇÃO CRUCIAL: Elabore o laudo COMPLETO de ponta a ponta sem cortes. "
+                "Comece em 'PODER JUDICIÁRIO DA UNIÃO' e responda a todos os 19 quesitos na íntegra até o encerramento com a assinatura.]"
+            )
+        else:
+            demanda_final = prompt_acionado
+
+        historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
+        contents.append(historico_texto)
+
+        config_ia = types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            max_output_tokens=8192,
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
+        )
+
+        with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
+            status_box = st.empty()
+            try:
+                if eh_pedido_laudo:
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
+                    
+                    stream_laudo = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_ia
+                    )
+                    
+                    partes_laudo = []
+                    for chunk in stream_laudo:
+                        if chunk.text:
+                            partes_laudo.append(chunk.text)
+                    
+                    texto_laudo = "".join(partes_laudo).strip()
+                    status_box.empty()
+
+                    if not texto_laudo:
+                        st.error("Não foi possível gerar a minuta do laudo. Tente novamente.")
+                    else:
+                        st.session_state.ultimo_laudo_gerado = texto_laudo
+                        doc_buf = gerar_docx_do_laudo(texto_laudo)
+                        nome_arquivo_doc = extrair_nome_arquivo_laudo(texto_laudo)
+
+                        msg_sucesso = (
+                            "✅ **Laudo Pericial Oficial elaborado com sucesso!**\n\n"
+                            "A minuta oficial do TRF5 (19ª Vara) com os 11 tópicos padronizados, análise cronológica, "
+                            "fundamentação de DID/DII e quesitos foi formatada no arquivo Word abaixo."
+                        )
+                        st.markdown(msg_sucesso)
+                        st.download_button(
+                            label="📥 Baixar Laudo Oficial em Word (.docx)",
+                            data=doc_buf,
+                            file_name=nome_arquivo_doc,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"dl_now_{len(st.session_state.messages)}"
+                        )
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": msg_sucesso,
+                            "is_laudo_card": True,
+                            "key_id": len(st.session_state.messages)
+                        })
+
+                else:
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_ia
+                    )
+
+                    def stream_com_limpeza(stream):
+                        limpou = False
+                        for chunk in stream:
+                            if chunk.text:
+                                if not limpou:
+                                    status_box.empty()
+                                    limpou = True
+                                yield chunk.text
+
+                    resposta_completa = st.write_stream(stream_com_limpeza(response_stream))
+                    status_box.empty()
+                    st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
+
+            except Exception as err:
+                status_box.empty()
+                st.error(f"Erro na resposta da Dra. Aninha: {err}")
