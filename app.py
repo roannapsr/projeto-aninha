@@ -195,7 +195,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         run_logo = p_logo.add_run()
         run_logo.add_picture(brasao_arquivo, width=Inches(1.1))
 
-    # Proteção estrita contra NoneType
     texto_seguro = str(texto_laudo or "")
     texto_limpo = texto_seguro.replace("**", "").replace("###", "").replace("##", "")
 
@@ -368,7 +367,7 @@ with st.sidebar:
         )
 
 # ----------------------------------------------------
-# 6. Interface Principal
+# 6. Captura de Entrada e Gerenciamento do Fluxo
 # ----------------------------------------------------
 col_header_avatar, col_header_text = st.columns([1, 8], vertical_alignment="center")
 
@@ -386,31 +385,6 @@ with col_header_text:
 
 st.markdown("---")
 
-if not st.session_state.messages:
-    with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
-        st.markdown(
-            "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
-            "Envie os dados do caso no chat ou anexe os documentos na barra lateral para analisarmos. "
-            "Quando desejar formalizar a minuta oficial, basta clicar em **🚀 Gerar Laudo Completo**!"
-        )
-
-for msg in st.session_state.messages:
-    avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
-    with st.chat_message(msg["role"], avatar=avatar_icon):
-        st.markdown(msg["content"])
-        if msg.get("is_laudo_card", False) and st.session_state.ultimo_laudo_gerado:
-            doc_buf_msg = gerar_docx_do_laudo(st.session_state.ultimo_laudo_gerado)
-            st.download_button(
-                label="📥 Baixar Laudo em Word (.docx)",
-                data=doc_buf_msg,
-                file_name="Laudo_Pericial_Dra_Aninha.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                key=f"dl_history_{msg.get('key_id', 0)}"
-            )
-
-# ----------------------------------------------------
-# 7. Processamento e Execução
-# ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
 
 prompt_acionado = None
@@ -443,14 +417,38 @@ elif btn_quesitos:
     )
 
 if prompt_acionado:
+    texto_card_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
+    st.session_state.messages.append({"role": "user", "content": texto_card_usuario})
+
+if not st.session_state.messages:
+    with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
+        st.markdown(
+            "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
+            "Envie os dados do caso no chat ou anexe os documentos na barra lateral para analisarmos. "
+            "Quando desejar formalizar a minuta oficial, basta clicar em **🚀 Gerar Laudo Completo**!"
+        )
+
+for msg in st.session_state.messages:
+    avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar_icon):
+        st.markdown(msg["content"])
+        if msg.get("is_laudo_card", False) and st.session_state.ultimo_laudo_gerado:
+            doc_buf_msg = gerar_docx_do_laudo(st.session_state.ultimo_laudo_gerado)
+            st.download_button(
+                label="📥 Baixar Laudo em Word (.docx)",
+                data=doc_buf_msg,
+                file_name="Laudo_Pericial_Dra_Aninha.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"dl_history_{msg.get('key_id', 0)}"
+            )
+
+# ----------------------------------------------------
+# 7. Execução da IA
+# ----------------------------------------------------
+if prompt_acionado:
     if not api_key:
         st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
     else:
-        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
-        st.session_state.messages.append({"role": "user", "content": texto_exibicao_usuario})
-        with st.chat_message("user"):
-            st.markdown(texto_exibicao_usuario)
-
         contents = []
         texto_documentos_docx = ""
 
@@ -510,7 +508,6 @@ if prompt_acionado:
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
             status_box = st.empty()
             try:
-                # 1. BOTÃO GERAR LAUDO: Gera o arquivo Word nos bastidores
                 if eh_pedido_laudo:
                     status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     response = client.models.generate_content(
@@ -519,7 +516,6 @@ if prompt_acionado:
                         config=config_ia
                     )
 
-                    # Extração segura e robusta do texto gerado
                     texto_laudo = ""
                     if hasattr(response, "text") and response.text:
                         texto_laudo = response.text
@@ -554,7 +550,6 @@ if prompt_acionado:
                             "key_id": len(st.session_state.messages)
                         })
 
-                # 2. CHAT / DISCUSSÃO: Análise com streaming em tempo real
                 else:
                     status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     response_stream = client.models.generate_content_stream(
