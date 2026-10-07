@@ -16,7 +16,6 @@ from google.genai import types
 # ----------------------------------------------------
 load_dotenv()
 
-# Ícone da aba do navegador (foto da Aninha)
 if os.path.exists("aninha.jpeg"):
     icone_aba = Image.open("aninha.jpeg")
 elif os.path.exists("aninha.png"):
@@ -30,7 +29,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilização CSS: Botão primário azul na barra lateral
 st.markdown(
     """
     <style>
@@ -61,7 +59,7 @@ Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11
 DIRETRIZ CRUCIAL DE SAÍDA:
 Quando for solicitado gerar o Laudo Pericial, NUNCA inicie sua resposta com saudações, introduções, justificativas ou conversas (NÃO diga "Aqui está o laudo", "Sim, como assistente técnica...", etc.). 
 SUA RESPOSTA DEVE COMEÇAR DIRETAMENTE NA PRIMEIRA LINHA DO CABEÇALHO OFICIAL: "PODER JUDICIÁRIO DA UNIÃO".
-NÃO UTILIZE MARCADORES DE ASTERISCOS (**) OU HASHTAGS (###). Entregue o texto formal puro.
+NÃO UTILIZE MARCADORES DE ASTERISCOS (**) OU HASHTAGS (###). Entregue o texto formal puro. Conclua SEMPRE todos os quesitos e finalize com o fecho oficial.
 
 ESTRUTURA OBRIGATÓRIA DO LAUDO:
 
@@ -172,14 +170,12 @@ Assinatura Eletrônica
 def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     doc = docx.Document()
 
-    # Configuração das margens (2 cm)
     for section in doc.sections:
         section.top_margin = Inches(0.8)
         section.bottom_margin = Inches(0.8)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
 
-    # Inserção do Brasão no topo se o arquivo existir
     brasao_arquivo = None
     for nome_b in ["brasao.png", "brasao.jpg", "brasao.jpeg", "logo.png"]:
         if os.path.exists(nome_b):
@@ -193,10 +189,8 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         run_logo = p_logo.add_run()
         run_logo.add_picture(brasao_arquivo, width=Inches(1.1))
 
-    # Limpeza: Elimina asteriscos Markdown
     texto_limpo = texto_laudo.replace("**", "").replace("###", "").replace("##", "")
 
-    # FILTRO: Localiza onde começa o cabeçalho oficial para descartar conversas anteriores
     linhas = texto_limpo.split("\n")
     inicio_real = 0
     for idx, l in enumerate(linhas):
@@ -214,7 +208,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # Cabeçalho institucional (centralizado e negrito)
         if any(h in linha.upper() for h in [
             "PODER JUDICIÁRIO DA UNIÃO",
             "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO",
@@ -232,7 +225,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # Assinatura oficial do final (centralizada)
         if any(ass in linha for ass in ["ANA PAULA DA COSTA HENRIQUES", "Médica Perita - CRM-PE 11.395", "Assinatura Eletrônica"]):
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -244,7 +236,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # Tabela pericial (se houver barras verticais '|')
         if "|" in linha:
             linhas_tabela = []
             while i < len(linhas_oficiais) and "|" in linhas_oficiais[i]:
@@ -278,7 +269,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         p.paragraph_format.line_spacing = 1.15
         p.paragraph_format.space_after = Pt(3)
 
-        # Títulos de seções (1. PREÂMBULO, QUADRO I, etc.)
         eh_secao = any(linha.startswith(f"{n}.") for n in range(1, 13)) or linha.startswith("QUADRO")
 
         if eh_secao:
@@ -287,7 +277,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             run.bold = True
             run.font.size = Pt(10.5)
         else:
-            # Rótulos de campos como "Processo nº:", "DID:", etc.
             if ":" in linha and len(linha.split(":", 1)[0]) < 45:
                 rotulo, valor = linha.split(":", 1)
                 run_r = p.add_run(rotulo + ":")
@@ -393,9 +382,8 @@ if not st.session_state.messages:
     with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
         st.markdown(
             "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
-            "Estou pronta com o padrão oficial do **TRF5 (19ª Vara)**. "
-            "Pode discutir o caso no chat ou anexar os autos em **Word (.docx), PDF ou Imagem** "
-            "na barra lateral e clicar em **🚀 Gerar Laudo Completo** para compilar e baixar diretamente o laudo formatado em Word!"
+            "Estou configurada com o padrão oficial do **TRF5 (19ª Vara)**. "
+            "Pode discutir o caso no chat ou colar os dados clínicos para gerar diretamente o laudo completo em Word!"
         )
 
 for msg in st.session_state.messages:
@@ -413,7 +401,7 @@ for msg in st.session_state.messages:
             )
 
 # ----------------------------------------------------
-# 7. Processamento e Execução
+# 7. Processamento com Detecção Inteligente e Sem Cortes
 # ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
 
@@ -422,6 +410,11 @@ eh_pedido_laudo = False
 
 if prompt_usuario:
     prompt_acionado = prompt_usuario
+    # DETECÇÃO INTELIGENTE: Se a mensagem contiver dados periciais típicos ou pedir laudo
+    texto_low = prompt_usuario.lower()
+    gatilhos_laudo = ["gerar laudo", "faça o laudo", "elabore o laudo", "minuta de laudo", "periciand", "laudo pericial", "dados do processo"]
+    if any(g in texto_low for g in gatilhos_laudo):
+        eh_pedido_laudo = True
 elif btn_laudo:
     eh_pedido_laudo = True
     prompt_acionado = (
@@ -449,7 +442,7 @@ if prompt_acionado:
     if not api_key:
         st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
     else:
-        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
+        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if (eh_pedido_laudo and btn_laudo) else prompt_acionado
         st.session_state.messages.append({"role": "user", "content": texto_exibicao_usuario})
         with st.chat_message("user"):
             st.markdown(texto_exibicao_usuario)
@@ -494,25 +487,37 @@ if prompt_acionado:
         if texto_documentos_docx:
             historico_texto += f"\nCONTEÚDO EXTRAÍDO DOS ARQUIVOS WORD:\n{texto_documentos_docx}\n"
 
-        historico_texto += f"\nNOVA DEMANDA:\n{prompt_acionado}"
+        # Se detectou que é laudo, injeta a instrução explícita para não truncar e responder tudo
+        if eh_pedido_laudo:
+            demanda_final = (
+                f"{prompt_acionado}\n\n[INSTRUÇÃO CRUCIAL: Elabore o laudo COMPLETO de ponta a ponta sem abreviações. "
+                "Comece em 'PODER JUDICIÁRIO DA UNIÃO' e responda a todos os quesitos até o encerramento com a assinatura.]"
+            )
+        else:
+            demanda_final = prompt_acionado
+
+        historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
         contents.append(historico_texto)
 
-        # Configuração com 8192 tokens para não truncar laudos extensos
+        # Configuração com 8192 tokens para NUNCA cortar o laudo
         config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             max_output_tokens=8192
         )
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
+            status_box = st.empty()
             try:
+                # SE FOR LAUDO: Gera diretamente o arquivo .docx sem poluir o chat com textos gigantescos
                 if eh_pedido_laudo:
-                    with st.spinner("Dra. Aninha está redigindo e formatando o Laudo Médico-Pericial oficial..."):
-                        response = client.models.generate_content(
-                            model="gemini-3.6-flash",
-                            contents=contents,
-                            config=config_ia
-                        )
-                        texto_laudo = response.text
+                    status_box.info("⏳ **Dra. Aninha está redigindo e formatando o Laudo Médico-Pericial oficial...**")
+                    response = client.models.generate_content(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_ia
+                    )
+                    texto_laudo = response.text
+                    status_box.empty()
 
                     st.session_state.ultimo_laudo_gerado = texto_laudo
                     doc_buf = gerar_docx_do_laudo(texto_laudo)
@@ -537,18 +542,28 @@ if prompt_acionado:
                         "key_id": len(st.session_state.messages)
                     })
 
+                # SE FOR DÚVIDA / CONVERSA GERAL: Mantém o streaming comum
                 else:
-                    with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
-                        response_stream = client.models.generate_content_stream(
-                            model="gemini-3.6-flash",
-                            contents=contents,
-                            config=config_ia
-                        )
-
-                    resposta_completa = st.write_stream(
-                        chunk.text for chunk in response_stream if chunk.text
+                    status_box.info("⏳ **Dra. Aninha está analisando os elementos periciais...**")
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-3.6-flash",
+                        contents=contents,
+                        config=config_ia
                     )
+
+                    def stream_com_limpeza(stream):
+                        limpou = False
+                        for chunk in stream:
+                            if chunk.text:
+                                if not limpou:
+                                    status_box.empty()
+                                    limpou = True
+                                yield chunk.text
+
+                    resposta_completa = st.write_stream(stream_com_limpeza(response_stream))
+                    status_box.empty()
                     st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
 
             except Exception as err:
+                status_box.empty()
                 st.error(f"Erro na resposta da Dra. Aninha: {err}")
