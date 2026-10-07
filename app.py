@@ -412,8 +412,9 @@ elif btn_dii:
     )
 elif btn_quesitos:
     prompt_acionado = (
-        "Com base nos documentos médicos e no histórico do caso, responda de forma técnica, "
-        "precisa e conclusiva aos 19 quesitos padrão do Quadro I do Juízo da 19ª Vara."
+        "Responda pontualmente, de forma conclusiva e técnica aos 19 quesitos padrão do Juízo "
+        "(Quadro I da 19ª Vara). Seja direta e fundamentada na resposta de cada quesito, sem rodeios, "
+        "concluindo rigorosamente todos os 19 quesitos do primeiro ao último."
     )
 
 if prompt_acionado:
@@ -443,7 +444,7 @@ for msg in st.session_state.messages:
             )
 
 # ----------------------------------------------------
-# 7. Execução da IA
+# 7. Execução da IA com Thinking Budget Desativado
 # ----------------------------------------------------
 if prompt_acionado:
     if not api_key:
@@ -500,9 +501,11 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
         contents.append(historico_texto)
 
+        # Configuração: max_output_tokens=8192 e thinking_budget=0 para 100% de saída sem truncamento
         config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
-            max_output_tokens=8192
+            max_output_tokens=8192,
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
         )
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
