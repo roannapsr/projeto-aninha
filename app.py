@@ -412,9 +412,10 @@ elif btn_dii:
     )
 elif btn_quesitos:
     prompt_acionado = (
-        "Responda pontualmente, de forma conclusiva e técnica aos 19 quesitos padrão do Juízo "
-        "(Quadro I da 19ª Vara). Seja direta e fundamentada na resposta de cada quesito, sem rodeios, "
-        "concluindo rigorosamente todos os 19 quesitos do primeiro ao último."
+        "Responda diretamente e de forma técnica a todos os 19 quesitos padrão do Juízo (Quadro I da 19ª Vara). "
+        "Para economizar espaço e evitar cortes, NÃO repita o enunciado completo das perguntas. "
+        "Apresente no formato: 'Quesito [Número]: [Resposta técnica pericial direta e fundamentada]'. "
+        "Conclua rigorosamente todos os 19 quesitos, do 1 ao 19 sem interrupção."
     )
 
 if prompt_acionado:
@@ -444,7 +445,7 @@ for msg in st.session_state.messages:
             )
 
 # ----------------------------------------------------
-# 7. Execução da IA com Thinking Budget Desativado
+# 7. Execução da IA com 65k Tokens e Thinking Desativado
 # ----------------------------------------------------
 if prompt_acionado:
     if not api_key:
@@ -501,10 +502,10 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
         contents.append(historico_texto)
 
-        # Configuração: max_output_tokens=8192 e thinking_budget=0 para 100% de saída sem truncamento
+        # Configuração com 65.536 tokens e thinking_budget=0 para evitar qualquer corte
         config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
-            max_output_tokens=8192,
+            max_output_tokens=65536,
             thinking_config=types.ThinkingConfig(thinking_budget=0)
         )
 
@@ -554,7 +555,7 @@ if prompt_acionado:
                         })
 
                 else:
-                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
+                    status_box.info("⏳ Só um momento, Dra Aninha responderá em breve...")
                     response_stream = client.models.generate_content_stream(
                         model="gemini-3.6-flash",
                         contents=contents,
