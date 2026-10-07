@@ -192,7 +192,7 @@ Assinatura Eletrônica
 """
 
 # ----------------------------------------------------
-# 3. Funções de Apoio e Gerador DOCX (Arial, 14 Título, 11 Corpo)
+# 3. Funções de Apoio e Gerador DOCX (Arial, Títulos 14, Corpo 11)
 # ----------------------------------------------------
 def extrair_nome_arquivo_laudo(texto_laudo: str) -> str:
     """Extrai o nome do periciado para gerar um arquivo no formato 'Laudo de [Nome].docx'."""
@@ -205,7 +205,7 @@ def extrair_nome_arquivo_laudo(texto_laudo: str) -> str:
     return "Laudo_Pericial_Dra_Aninha.docx"
 
 def adicionar_paragrafo_com_negrito(paragrafo, texto: str, tamanho=11, bold_padrao=False):
-    """Insere runs com fonte Arial e negrito condicional."""
+    """Insere runs com fonte Arial, tamanho ajustável e negrito condicional."""
     partes = re.split(r"(\*\*.*?\*\*)", texto)
     for p in partes:
         if not p:
@@ -224,7 +224,7 @@ def adicionar_paragrafo_com_negrito(paragrafo, texto: str, tamanho=11, bold_padr
 def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     doc = docx.Document()
 
-    # Define Arial como a fonte padrão no estilo Normal do documento
+    # Define Arial 11 como o estilo Normal padrão
     style_normal = doc.styles["Normal"]
     style_normal.font.name = "Arial"
     style_normal.font.size = Pt(11)
@@ -236,7 +236,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
 
-    # 1. Brasão Proporcional e Discreto (0.7 polegadas)
+    # 1. Brasão Proporcional e Discreto (~0.72 polegadas)
     brasao_arquivo = None
     for nome_b in ["brasao.png", "brasao.jpg", "brasao.jpeg", "logo.png"]:
         if os.path.exists(nome_b):
@@ -264,7 +264,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
 
     linhas_oficiais = linhas[inicio_real:]
 
-    # Remove qualquer variação de assinatura gerada no corpo para padronizar no final
+    # Remove repetições de encerramento do corpo para gerar o bloco fixo padronizado no fim
     linhas_corpo = []
     for l in linhas_oficiais:
         l_check = l.strip().replace("*", "")
@@ -285,7 +285,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
 
         linha_sem_md = linha.replace("*", "").strip()
 
-        # 2. Cabeçalho Institucional Centralizado (Arial, Tam 11 + Negrito)
+        # 2. Cabeçalho Institucional Centralizado (Arial 11 + Negrito)
         if any(h in linha_sem_md.upper() for h in [
             "PODER JUDICIÁRIO DA UNIÃO",
             "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO",
@@ -304,7 +304,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # 3. Título Principal em Destaque Alinhado à Esquerda (Arial, Tam 14 + Negrito)
+        # 3. Título Principal (Arial 14 + Negrito, alinhado à esquerda)
         if "LAUDO DE EXAME MÉDICO-PERICIAL" in linha_sem_md.upper():
             p_titulo = doc.add_paragraph()
             p_titulo.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -317,7 +317,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # Tabela pericial (Arial, Tam 11)
+        # 4. Tabela pericial (Arial 11)
         if "|" in linha:
             linhas_tabela = []
             while i < len(linhas_corpo) and "|" in linhas_corpo[i]:
@@ -349,19 +349,19 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
                 p_espaco.paragraph_format.space_before = Pt(4)
             continue
 
-        # Parágrafos e Seções (Arial, Tam 11)
+        # 5. Parágrafos comuns e Títulos de Seção
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.15
 
         eh_secao = any(linha_sem_md.startswith(f"{n}.") for n in range(1, 13)) or linha_sem_md.startswith("QUADRO")
 
         if eh_secao:
-            # Título da seção (1. PREÂMBULO) tam 11 + negrito
-            p.paragraph_format.space_before = Pt(14)
+            # TÍTULO DAS SEÇÕES: Arial 14 + Negrito
+            p.paragraph_format.space_before = Pt(16)
             p.paragraph_format.space_after = Pt(4)
-            adicionar_paragrafo_com_negrito(p, linha, tamanho=11, bold_padrao=True)
+            adicionar_paragrafo_com_negrito(p, linha, tamanho=14, bold_padrao=True)
         else:
-            # Corpo do laudo tam 11
+            # CORPO DO LAUDO: Arial 11 (texto regular)
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(3)
             linha_formatada = linha
@@ -371,8 +371,8 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
 
         i += 1
 
-    # 4. Encerramento Centralizado Padronizado com Tamanhos Específicos
-    # Nome da médica: Arial 11 + negrito
+    # 6. Encerramento Centralizado Padronizado
+    # Nome da médica: Arial 11 + Negrito
     p_ass1 = doc.add_paragraph()
     p_ass1.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_ass1.paragraph_format.space_before = Pt(32)
@@ -382,7 +382,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     run_ass1.font.name = "Arial"
     run_ass1.font.size = Pt(11)
 
-    # Função e CRM: Arial 11
+    # Cargo e CRM: Arial 11
     p_ass2 = doc.add_paragraph()
     p_ass2.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_ass2.paragraph_format.space_before = Pt(0)
