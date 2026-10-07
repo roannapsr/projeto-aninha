@@ -58,7 +58,12 @@ SYSTEM_INSTRUCTION = """
 Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial.
 Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11.395), Perita Judicial Federal da Seção Judiciária de Pernambuco (19ª Vara - TRF5).
 
-Ao redigir o LAUDO PERICIAL, siga rigorosamente a estrutura, termos e disposição formal abaixo, SEM UTILIZAR MARCADORES MARKDOWN DE ASTERISCOS (NÃO use ** no texto). Escreva o texto limpo com os títulos numerados em caixa alta:
+DIRETRIZ CRUCIAL DE SAÍDA:
+Quando for solicitado gerar o Laudo Pericial, NUNCA inicie sua resposta com saudações, introduções, justificativas ou conversas (NÃO diga "Aqui está o laudo", "Sim, como assistente técnica...", etc.). 
+SUA RESPOSTA DEVE COMEÇAR DIRETAMENTE NA PRIMEIRA LINHA DO CABEÇALHO OFICIAL: "PODER JUDICIÁRIO DA UNIÃO".
+NÃO UTILIZE MARCADORES DE ASTERISCOS (**) OU HASHTAGS (###). Entregue o texto formal puro.
+
+ESTRUTURA OBRIGATÓRIA DO LAUDO:
 
 PODER JUDICIÁRIO DA UNIÃO
 TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO
@@ -111,7 +116,7 @@ Exame Dermatológico:
 Aparelho Locomotor: 
 
 8. DOCUMENTOS AVALIADOS
-(Listar em ordem cronológica de forma crítica os atestados, laudos e exames de imagem)
+(Listar em ordem cronológica de forma crítica os atestados, laudos e exames)
 
 9. CONCLUSÃO PERICIAL
 Data do Início da Doença (DID): 
@@ -119,7 +124,6 @@ Data do Início da Incapacidade (DII):
 O conjunto de patologias referenciado nos documentos médicos e administrativos juntados aos autos foi integralmente considerado no âmbito desta perícia, conduzida segundo protocolo técnico-científico próprio da medicina pericial. O procedimento adotado observou as seguintes etapas: identificação da demanda judicial e de seu objeto; levantamento e qualificação do periciado; coleta dos dados específicos da perícia; mapeamento das enfermidades alegadas e de sua evolução clínica; realização de anamnese e exame físico e/ou mental; apreciação crítica de atestados, laudos, exames complementares e documentos administrativos; cotejo com perícias anteriores eventualmente existentes; síntese integrativa de todos os elementos colhidos; e elaboração das respostas técnicas aos quesitos formulados pelo Juízo e pelas partes.
 
 Patologia / Condição Clínica | CID-10 | Enquadramento Pericial e Fundamentação Técnica
-(Preencher os enquadramentos periciais)
 
 Conclusões diagnósticas: 
 Esclarecimentos: 
@@ -155,12 +159,15 @@ Ver conclusão pericial
 
 11. ANEXOS (Fotos e Laudo da perícia trazidas pelo periciando(a))
 
+Recife, [Data da Perícia].
+
 ANA PAULA DA COSTA HENRIQUES
 Médica Perita - CRM-PE 11.395
+Assinatura Eletrônica
 """
 
 # ----------------------------------------------------
-# 3. Função para Gerar Arquivo .DOCX Formatado
+# 3. Função para Gerar Arquivo .DOCX Limpo e Oficial
 # ----------------------------------------------------
 def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
     doc = docx.Document()
@@ -186,38 +193,62 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         run_logo = p_logo.add_run()
         run_logo.add_picture(brasao_arquivo, width=Inches(1.1))
 
-    # Cabeçalho Oficial Centralizado
-    p_cab = doc.add_paragraph()
-    p_cab.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_cab.paragraph_format.space_after = Pt(12)
-    p_cab.paragraph_format.line_spacing = 1.15
-    run_cab = p_cab.add_run(
-        "PODER JUDICIÁRIO DA UNIÃO\n"
-        "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO\n"
-        "JUSTIÇA FEDERAL DE PRIMEIRA INSTÂNCIA\n"
-        "SEÇÃO JUDICIÁRIA DE PERNAMBUCO - 19ª VARA\n\n"
-        "LAUDO DE EXAME MÉDICO-PERICIAL\n"
-    )
-    run_cab.bold = True
-    run_cab.font.size = Pt(11)
-
-    # Remove os asteriscos (**) que causam poluição visual
+    # Limpeza: Elimina asteriscos Markdown
     texto_limpo = texto_laudo.replace("**", "").replace("###", "").replace("##", "")
 
+    # FILTRO: Localiza onde começa o cabeçalho oficial para descartar conversas anteriores
     linhas = texto_limpo.split("\n")
+    inicio_real = 0
+    for idx, l in enumerate(linhas):
+        l_upper = l.strip().upper()
+        if "PODER JUDICIÁRIO DA UNIÃO" in l_upper or "LAUDO DE EXAME MÉDICO-PERICIAL" in l_upper or "1. PREÂMBULO" in l_upper:
+            inicio_real = idx
+            break
+
+    linhas_oficiais = linhas[inicio_real:]
+
     i = 0
-    while i < len(linhas):
-        linha = linhas[i].strip()
+    while i < len(linhas_oficiais):
+        linha = linhas_oficiais[i].strip()
         if not linha:
             i += 1
             continue
 
-        # Se a linha for linha de tabela (contém '|')
-        if "|" in linha and not linha.startswith("#"):
+        # Cabeçalho institucional (centralizado e negrito)
+        if any(h in linha.upper() for h in [
+            "PODER JUDICIÁRIO DA UNIÃO",
+            "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO",
+            "JUSTIÇA FEDERAL DE PRIMEIRA INSTÂNCIA",
+            "SEÇÃO JUDICIÁRIA DE PERNAMBUCO - 19ª VARA",
+            "LAUDO DE EXAME MÉDICO-PERICIAL"
+        ]):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.line_spacing = 1.15
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(linha)
+            run.bold = True
+            run.font.size = Pt(11)
+            i += 1
+            continue
+
+        # Assinatura oficial do final (centralizada)
+        if any(ass in linha for ass in ["ANA PAULA DA COSTA HENRIQUES", "Médica Perita - CRM-PE 11.395", "Assinatura Eletrônica"]):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.line_spacing = 1.15
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(linha)
+            run.bold = True
+            run.font.size = Pt(10)
+            i += 1
+            continue
+
+        # Tabela pericial (se houver barras verticais '|')
+        if "|" in linha:
             linhas_tabela = []
-            while i < len(linhas) and "|" in linhas[i]:
-                l_tab = linhas[i].strip()
-                # Ignora linha de separação como |---|---|
+            while i < len(linhas_oficiais) and "|" in linhas_oficiais[i]:
+                l_tab = linhas_oficiais[i].strip()
                 if not re.match(r"^\|?[\s\-:|]+\|?$", l_tab):
                     colunas = [c.strip() for c in l_tab.strip("|").split("|")]
                     if any(colunas):
@@ -247,7 +278,7 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
         p.paragraph_format.line_spacing = 1.15
         p.paragraph_format.space_after = Pt(3)
 
-        # Detecta se é título de seção (1. PREÂMBULO, etc.)
+        # Títulos de seções (1. PREÂMBULO, QUADRO I, etc.)
         eh_secao = any(linha.startswith(f"{n}.") for n in range(1, 13)) or linha.startswith("QUADRO")
 
         if eh_secao:
@@ -256,8 +287,8 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             run.bold = True
             run.font.size = Pt(10.5)
         else:
-            # Se for linha de campo (ex: "Processo nº: ...") coloca o rótulo em negrito
-            if ":" in linha and len(linha.split(":", 1)[0]) < 40:
+            # Rótulos de campos como "Processo nº:", "DID:", etc.
+            if ":" in linha and len(linha.split(":", 1)[0]) < 45:
                 rotulo, valor = linha.split(":", 1)
                 run_r = p.add_run(rotulo + ":")
                 run_r.bold = True
@@ -269,18 +300,6 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
                 run.font.size = Pt(10)
 
         i += 1
-
-    # Assinatura Oficial da Perita
-    p_assinatura = doc.add_paragraph()
-    p_assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_assinatura.paragraph_format.space_before = Pt(24)
-    run_ass = p_assinatura.add_run(
-        "ANA PAULA DA COSTA HENRIQUES\n"
-        "Médica Perita - CRM-PE 11.395\n"
-        "Assinatura Eletrônica"
-    )
-    run_ass.bold = True
-    run_ass.font.size = Pt(10)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -375,17 +394,26 @@ if not st.session_state.messages:
         st.markdown(
             "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
             "Estou pronta com o padrão oficial do **TRF5 (19ª Vara)**. "
-            "Pode ditar os elementos do periciando ou anexar os autos em **Word (.docx), PDF ou Imagem** "
-            "na barra lateral e clicar em **🚀 Gerar Laudo Completo** para redigir o laudo e disponibilizar o arquivo `.docx` com brasão e formatação limpa!"
+            "Pode discutir o caso no chat ou anexar os autos em **Word (.docx), PDF ou Imagem** "
+            "na barra lateral e clicar em **🚀 Gerar Laudo Completo** para compilar e baixar diretamente o laudo formatado em Word!"
         )
 
 for msg in st.session_state.messages:
     avatar_icon = ("aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️") if msg["role"] == "assistant" else None
     with st.chat_message(msg["role"], avatar=avatar_icon):
         st.markdown(msg["content"])
+        if msg.get("is_laudo_card", False) and st.session_state.ultimo_laudo_gerado:
+            doc_buf_msg = gerar_docx_do_laudo(st.session_state.ultimo_laudo_gerado)
+            st.download_button(
+                label="📥 Baixar Laudo em Word (.docx)",
+                data=doc_buf_msg,
+                file_name="Laudo_Pericial_Dra_Aninha.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"dl_history_{msg.get('key_id', 0)}"
+            )
 
 # ----------------------------------------------------
-# 7. Processamento, Spinner e Streaming
+# 7. Processamento e Execução
 # ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
 
@@ -397,10 +425,12 @@ if prompt_usuario:
 elif btn_laudo:
     eh_pedido_laudo = True
     prompt_acionado = (
-        "Com base em todos os documentos anexados e nos dados do caso, elabore o LAUDO DE EXAME MÉDICO-PERICIAL "
-        "completo da 19ª Vara / TRF5, preenchendo todos os 11 itens oficiais sem marcadores de asteriscos (**), "
-        "com fundamentação de DID e DII, o quadro comparativo de patologias, respostas completas aos 19 quesitos "
-        "do Juízo e encerramento em nome da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)."
+        "Elabore a minuta completa do LAUDO DE EXAME MÉDICO-PERICIAL oficial da 19ª Vara / TRF5, "
+        "com base estritamente nos documentos anexados e nos fatos informados. "
+        "Comece DIRETAMENTE pelo cabeçalho institucional (PODER JUDICIÁRIO DA UNIÃO), sem mensagens prévias. "
+        "Preencha todos os 11 itens oficiais sem marcadores de asteriscos (**), fundamentando DID e DII, "
+        "o quadro comparativo de patologias, respondendo integralmente aos 19 quesitos do Juízo "
+        "e finalizando com o encerramento formal da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)."
     )
 elif btn_dii:
     prompt_acionado = (
@@ -419,9 +449,10 @@ if prompt_acionado:
     if not api_key:
         st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
     else:
-        st.session_state.messages.append({"role": "user", "content": prompt_acionado})
+        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
+        st.session_state.messages.append({"role": "user", "content": texto_exibicao_usuario})
         with st.chat_message("user"):
-            st.markdown(prompt_acionado)
+            st.markdown(texto_exibicao_usuario)
 
         contents = []
         texto_documentos_docx = ""
@@ -466,36 +497,58 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{prompt_acionado}"
         contents.append(historico_texto)
 
+        # Configuração com 8192 tokens para não truncar laudos extensos
         config_ia = types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION
+            system_instruction=SYSTEM_INSTRUCTION,
+            max_output_tokens=8192
         )
 
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
             try:
-                # O spinner é exibido enquanto o Gemini processa a resposta
-                with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
-                    response_stream = client.models.generate_content_stream(
-                        model="gemini-3.6-flash",
-                        contents=contents,
-                        config=config_ia
+                if eh_pedido_laudo:
+                    with st.spinner("Dra. Aninha está redigindo e formatando o Laudo Médico-Pericial oficial..."):
+                        response = client.models.generate_content(
+                            model="gemini-3.6-flash",
+                            contents=contents,
+                            config=config_ia
+                        )
+                        texto_laudo = response.text
+
+                    st.session_state.ultimo_laudo_gerado = texto_laudo
+                    doc_buf = gerar_docx_do_laudo(texto_laudo)
+
+                    msg_sucesso = (
+                        "✅ **Laudo Pericial Oficial elaborado com sucesso!**\n\n"
+                        "A minuta com os 11 tópicos padronizados do TRF5 (19ª Vara), análise documental, "
+                        "fundamentação de DID/DII e quesitos já foi processada e formatada no arquivo Word abaixo."
                     )
-
-                # O streaming ocorre em tempo real
-                resposta_completa = st.write_stream(
-                    chunk.text for chunk in response_stream if chunk.text
-                )
-                st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
-
-                # Se foi gerado um laudo, disponibiliza o download em .docx
-                if eh_pedido_laudo or "LAUDO DE EXAME MÉDICO-PERICIAL" in resposta_completa or "PREÂMBULO" in resposta_completa:
-                    st.session_state.ultimo_laudo_gerado = resposta_completa
-                    doc_buf = gerar_docx_do_laudo(resposta_completa)
+                    st.markdown(msg_sucesso)
                     st.download_button(
-                        label="📥 Baixar Este Laudo em Word (.docx)",
+                        label="📥 Baixar Laudo Oficial em Word (.docx)",
                         data=doc_buf,
                         file_name="Laudo_Pericial_Dra_Aninha.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key=f"dl_{len(st.session_state.messages)}"
+                        key=f"dl_now_{len(st.session_state.messages)}"
                     )
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": msg_sucesso,
+                        "is_laudo_card": True,
+                        "key_id": len(st.session_state.messages)
+                    })
+
+                else:
+                    with st.spinner("Dra. Aninha está analisando os elementos periciais..."):
+                        response_stream = client.models.generate_content_stream(
+                            model="gemini-3.6-flash",
+                            contents=contents,
+                            config=config_ia
+                        )
+
+                    resposta_completa = st.write_stream(
+                        chunk.text for chunk in response_stream if chunk.text
+                    )
+                    st.session_state.messages.append({"role": "assistant", "content": resposta_completa})
+
             except Exception as err:
                 st.error(f"Erro na resposta da Dra. Aninha: {err}")
