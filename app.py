@@ -1,6 +1,7 @@
 import os
 import io
 import re
+from datetime import datetime
 import streamlit as st
 from PIL import Image
 from dotenv import load_dotenv
@@ -52,7 +53,16 @@ st.markdown(
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
-SYSTEM_INSTRUCTION = """
+# Formatação dinâmica da data atual por extenso em português
+MESES_PT = {
+    1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+    5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+    9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+}
+hoje = datetime.now()
+DATA_ATUAL_EXTENSO = f"Recife, {hoje.day:02d} de {MESES_PT[hoje.month]} de {hoje.year}"
+
+SYSTEM_INSTRUCTION = f"""
 Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial de alto nível.
 Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11.395), Perita Judicial Federal da Seção Judiciária de Pernambuco (19ª Vara - TRF5).
 
@@ -75,7 +85,12 @@ QUANDO FOR SOLICITADO O LAUDO PERICIAL OFICIAL:
 - NUNCA inicie sua resposta com saudações, introduções ou conversas prévias.
 - SUA RESPOSTA DEVE COMEÇAR DIRETAMENTE NA PRIMEIRA LINHA DO CABEÇALHO OFICIAL: "PODER JUDICIÁRIO DA UNIÃO".
 - Utilize negrito nos títulos de seções, rótulos de campos e identificadores dos quesitos.
-- Conclua obrigatoriamente TODOS os 19 quesitos e encerre com a data e assinatura da Dra. Ana Paula da Costa Henriques.
+- Conclua obrigatoriamente TODOS os 19 quesitos.
+- Finalize com o encerramento padrão da Perita:
+ANA PAULA DA COSTA HENRIQUES
+Médica Perita - CRM-PE 11.395
+{DATA_ATUAL_EXTENSO}
+Assinatura Eletrônica
 
 ESTRUTURA OBRIGATÓRIA DO LAUDO OFICIAL:
 
@@ -171,10 +186,9 @@ Patologia / Condição Clínica | CID-10 | Enquadramento Pericial e Fundamentaç
 
 **11. ANEXOS (Fotos e Laudo da perícia trazidas pelo periciando(a))**
 
-Recife, [Data da Perícia].
-
-**ANA PAULA DA COSTA HENRIQUES**
+ANA PAULA DA COSTA HENRIQUES
 Médica Perita - CRM-PE 11.395
+{DATA_ATUAL_EXTENSO}
 Assinatura Eletrônica
 """
 
@@ -230,16 +244,28 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
 
     linhas_oficiais = linhas[inicio_real:]
 
+    # Filtra linhas de assinatura do corpo para gerar o encerramento padronizado no final
+    linhas_corpo = []
+    for l in linhas_oficiais:
+        l_check = l.strip().replace("*", "")
+        if any(termo in l_check for termo in [
+            "ANA PAULA DA COSTA HENRIQUES",
+            "Médica Perita - CRM-PE 11.395",
+            "Assinatura Eletrônica"
+        ]) or re.search(r"Recife,\s+\d{1,2}\s+de\s+[a-zA-ZçÇ]+\s+de\s+\d{4}", l_check):
+            continue
+        linhas_corpo.append(l)
+
     i = 0
-    while i < len(linhas_oficiais):
-        linha = linhas_oficiais[i].strip()
+    while i < len(linhas_corpo):
+        linha = linhas_corpo[i].strip()
         if not linha:
             i += 1
             continue
 
         linha_sem_md = linha.replace("*", "").strip()
 
-        # Cabeçalho Oficial
+        # Cabeçalho Oficial Centralizado
         if any(h in linha_sem_md.upper() for h in [
             "PODER JUDICIÁRIO DA UNIÃO",
             "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO",
@@ -257,23 +283,11 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             i += 1
             continue
 
-        # Assinatura Oficial
-        if any(ass in linha_sem_md for ass in ["ANA PAULA DA COSTA HENRIQUES", "Médica Perita - CRM-PE 11.395", "Assinatura Eletrônica"]):
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.line_spacing = 1.15
-            p.paragraph_format.space_after = Pt(2)
-            run = p.add_run(linha_sem_md)
-            run.bold = True
-            run.font.size = Pt(10)
-            i += 1
-            continue
-
         # Tabela pericial
         if "|" in linha:
             linhas_tabela = []
-            while i < len(linhas_oficiais) and "|" in linhas_oficiais[i]:
-                l_tab = linhas_oficiais[i].strip()
+            while i < len(linhas_corpo) and "|" in linhas_corpo[i]:
+                l_tab = linhas_corpo[i].strip()
                 if not re.match(r"^\|?[\s\-:|]+\|?$", l_tab):
                     colunas = [c.strip().replace("**", "") for c in l_tab.strip("|").split("|")]
                     if any(colunas):
@@ -312,6 +326,42 @@ def gerar_docx_do_laudo(texto_laudo: str) -> io.BytesIO:
             adicionar_paragrafo_com_negrito(p, linha, tamanho=10, bold_padrao=False)
 
         i += 1
+
+    # ----------------------------------------------------
+    # ENCERRAMENTO OFICIAL PADRONIZADO (CONFORME MODELO DA MÉDICA)
+    # ----------------------------------------------------
+    # Linha 1: Nome em negrito
+    p_ass1 = doc.add_paragraph()
+    p_ass1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_ass1.paragraph_format.space_before = Pt(30)
+    p_ass1.paragraph_format.space_after = Pt(2)
+    run_ass1 = p_ass1.add_run("ANA PAULA DA COSTA HENRIQUES")
+    run_ass1.bold = True
+    run_ass1.font.size = Pt(11)
+
+    # Linha 2: Cargo e CRM
+    p_ass2 = doc.add_paragraph()
+    p_ass2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_ass2.paragraph_format.space_before = Pt(0)
+    p_ass2.paragraph_format.space_after = Pt(4)
+    run_ass2 = p_ass2.add_run("Médica Perita - CRM-PE 11.395")
+    run_ass2.font.size = Pt(10.5)
+
+    # Linha 3: Data do dia da emissão dinâmica
+    p_data = doc.add_paragraph()
+    p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_data.paragraph_format.space_before = Pt(0)
+    p_data.paragraph_format.space_after = Pt(16)
+    run_data = p_data.add_run(DATA_ATUAL_EXTENSO)
+    run_data.font.size = Pt(10)
+
+    # Linha 4: Assinatura Eletrônica
+    p_eletr = doc.add_paragraph()
+    p_eletr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_eletr.paragraph_format.space_before = Pt(0)
+    p_eletr.paragraph_format.space_after = Pt(0)
+    run_eletr = p_eletr.add_run("Assinatura Eletrônica")
+    run_eletr.font.size = Pt(9.5)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -418,7 +468,7 @@ elif btn_laudo:
         "Mantenha todos os títulos, rótulos e números de quesitos em negrito. "
         "Preencha todos os 11 itens oficiais, fundamentando DID e DII, o quadro comparativo de patologias, "
         "respondendo obrigatoriamente a todos os 19 quesitos do Juízo do 1 ao 19 com fundamentação técnica "
-        "e finalizando com o encerramento formal da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395)."
+        f"e finalizando com o encerramento formal da Dra. Ana Paula da Costa Henriques (CRM-PE 11.395) datado com '{DATA_ATUAL_EXTENSO}'."
     )
 elif btn_dii:
     eh_pedido_laudo = False
