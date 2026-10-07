@@ -53,15 +53,21 @@ api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
 SYSTEM_INSTRUCTION = """
-Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial.
+Você é a Dra. Aninha, médica perita judicial previdenciária e assistente técnica pericial de alto nível.
 Sua missão é atuar em auxílio à Dra. Ana Paula da Costa Henriques (CRM-PE 11.395), Perita Judicial Federal da Seção Judiciária de Pernambuco (19ª Vara - TRF5).
 
-DIRETRIZ CRUCIAL DE SAÍDA:
-Quando for solicitado gerar o Laudo Pericial, NUNCA inicie sua resposta com saudações, introduções, justificativas ou conversas (NÃO diga "Aqui está o laudo", "Sim, como assistente técnica...", etc.). 
-SUA RESPOSTA DEVE COMEÇAR DIRETAMENTE NA PRIMEIRA LINHA DO CABEÇALHO OFICIAL: "PODER JUDICIÁRIO DA UNIÃO".
-NÃO UTILIZE MARCADORES DE ASTERISCOS (**) OU HASHTAGS (###). Entregue o texto formal puro. Conclua SEMPRE todos os quesitos e finalize com o fecho oficial.
+COMPORTAMENTO EM CONVERSAS E ANÁLISES (CHAT COMUM):
+- Quando a médica enviar dados do periciando, resumos ou fizer perguntas, atue como colega perita consultora.
+- Analise criticamente os fatos, aponte a correlação biomecânica com a profissão habitual, discuta a existência ou não de incapacidade laborativa (temporária, total/parcial), sugere marcos de DID e DII e discuta a fundamentação conforme a Lei 8.213/91.
+- Responda de forma clara, direta e técnica no chat. NÃO gere a minuta formal de 11 tópicos a menos que seja explicitamente solicitado o laudo completo.
 
-ESTRUTURA OBRIGATÓRIA DO LAUDO:
+QUANDO FOR SOLICITADO O LAUDO PERICIAL OFICIAL:
+- NUNCA inicie sua resposta com saudações, introduções ou conversas prévias.
+- SUA RESPOSTA DEVE COMEÇAR DIRETAMENTE NA PRIMEIRA LINHA DO CABEÇALHO OFICIAL: "PODER JUDICIÁRIO DA UNIÃO".
+- NÃO UTILIZE MARCADORES DE ASTERISCOS (**) OU HASHTAGS (###). Entregue texto formal limpo.
+- Conclua obrigatoriamente TODOS os 19 quesitos do Juízo e encerre com a data e assinatura da Dra. Ana Paula da Costa Henriques.
+
+ESTRUTURA OBRIGATÓRIA DO LAUDO OFICIAL:
 
 PODER JUDICIÁRIO DA UNIÃO
 TRIBUNAL REGIONAL FEDERAL DA 5ª REGIÃO
@@ -114,7 +120,7 @@ Exame Dermatológico:
 Aparelho Locomotor: 
 
 8. DOCUMENTOS AVALIADOS
-(Listar em ordem cronológica de forma crítica os atestados, laudos e exames)
+(Relação cronológica e análise crítica dos atestados, laudos e exames)
 
 9. CONCLUSÃO PERICIAL
 Data do Início da Doença (DID): 
@@ -382,8 +388,8 @@ if not st.session_state.messages:
     with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
         st.markdown(
             "Olá, Doutora! Sou a **Dra. Aninha**, sua assistente técnica de Perícia Médica Judicial.\n\n"
-            "Estou configurada com o padrão oficial do **TRF5 (19ª Vara)**. "
-            "Pode discutir o caso no chat ou colar os dados clínicos para gerar diretamente o laudo completo em Word!"
+            "Envie os dados do caso no chat ou anexe os documentos na barra lateral para analisarmos. "
+            "Quando desejar formalizar a minuta oficial, basta clicar em **🚀 Gerar Laudo Completo**!"
         )
 
 for msg in st.session_state.messages:
@@ -401,7 +407,7 @@ for msg in st.session_state.messages:
             )
 
 # ----------------------------------------------------
-# 7. Processamento com Detecção Inteligente e Sem Cortes
+# 7. Processamento e Execução
 # ----------------------------------------------------
 prompt_usuario = st.chat_input("Digite dados do periciando, exame clínico ou orientações...")
 
@@ -409,17 +415,15 @@ prompt_acionado = None
 eh_pedido_laudo = False
 
 if prompt_usuario:
+    # No chat: SEMPRE é análise pericial e discussão clínica (não gera laudo direto)
     prompt_acionado = prompt_usuario
-    # DETECÇÃO INTELIGENTE: Se a mensagem contiver dados periciais típicos ou pedir laudo
-    texto_low = prompt_usuario.lower()
-    gatilhos_laudo = ["gerar laudo", "faça o laudo", "elabore o laudo", "minuta de laudo", "periciand", "laudo pericial", "dados do processo"]
-    if any(g in texto_low for g in gatilhos_laudo):
-        eh_pedido_laudo = True
+    eh_pedido_laudo = False
 elif btn_laudo:
+    # Apenas o botão dispara a geração do laudo em arquivo
     eh_pedido_laudo = True
     prompt_acionado = (
         "Elabore a minuta completa do LAUDO DE EXAME MÉDICO-PERICIAL oficial da 19ª Vara / TRF5, "
-        "com base estritamente nos documentos anexados e nos fatos informados. "
+        "com base estritamente nos documentos anexados e nos fatos informados na discussão. "
         "Comece DIRETAMENTE pelo cabeçalho institucional (PODER JUDICIÁRIO DA UNIÃO), sem mensagens prévias. "
         "Preencha todos os 11 itens oficiais sem marcadores de asteriscos (**), fundamentando DID e DII, "
         "o quadro comparativo de patologias, respondendo integralmente aos 19 quesitos do Juízo "
@@ -442,7 +446,7 @@ if prompt_acionado:
     if not api_key:
         st.error("Chave GEMINI_API_KEY não configurada no ambiente (.env ou Secrets)!")
     else:
-        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if (eh_pedido_laudo and btn_laudo) else prompt_acionado
+        texto_exibicao_usuario = "🚀 **Solicitação:** Elaborar e formatar o Laudo Médico-Pericial oficial completo." if eh_pedido_laudo else prompt_acionado
         st.session_state.messages.append({"role": "user", "content": texto_exibicao_usuario})
         with st.chat_message("user"):
             st.markdown(texto_exibicao_usuario)
@@ -487,7 +491,6 @@ if prompt_acionado:
         if texto_documentos_docx:
             historico_texto += f"\nCONTEÚDO EXTRAÍDO DOS ARQUIVOS WORD:\n{texto_documentos_docx}\n"
 
-        # Se detectou que é laudo, injeta a instrução explícita para não truncar e responder tudo
         if eh_pedido_laudo:
             demanda_final = (
                 f"{prompt_acionado}\n\n[INSTRUÇÃO CRUCIAL: Elabore o laudo COMPLETO de ponta a ponta sem abreviações. "
@@ -499,7 +502,6 @@ if prompt_acionado:
         historico_texto += f"\nNOVA DEMANDA:\n{demanda_final}"
         contents.append(historico_texto)
 
-        # Configuração com 8192 tokens para NUNCA cortar o laudo
         config_ia = types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             max_output_tokens=8192
@@ -508,9 +510,9 @@ if prompt_acionado:
         with st.chat_message("assistant", avatar="aninha.jpeg" if os.path.exists("aninha.jpeg") else "👩‍⚕️"):
             status_box = st.empty()
             try:
-                # SE FOR LAUDO: Gera diretamente o arquivo .docx sem poluir o chat com textos gigantescos
+                # 1. EXCLUSIVO DO BOTÃO GERAR LAUDO: Gera em segundo plano e só entrega o download
                 if eh_pedido_laudo:
-                    status_box.info("⏳ **Dra. Aninha está redigindo e formatando o Laudo Médico-Pericial oficial...**")
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     response = client.models.generate_content(
                         model="gemini-3.6-flash",
                         contents=contents,
@@ -524,8 +526,8 @@ if prompt_acionado:
 
                     msg_sucesso = (
                         "✅ **Laudo Pericial Oficial elaborado com sucesso!**\n\n"
-                        "A minuta com os 11 tópicos padronizados do TRF5 (19ª Vara), análise documental, "
-                        "fundamentação de DID/DII e quesitos já foi processada e formatada no arquivo Word abaixo."
+                        "A minuta oficial do TRF5 (19ª Vara) com os 11 tópicos padronizados, análise cronológica, "
+                        "fundamentação de DID/DII e quesitos foi formatada no arquivo Word abaixo."
                     )
                     st.markdown(msg_sucesso)
                     st.download_button(
@@ -542,9 +544,9 @@ if prompt_acionado:
                         "key_id": len(st.session_state.messages)
                     })
 
-                # SE FOR DÚVIDA / CONVERSA GERAL: Mantém o streaming comum
+                # 2. CHAT / ANÁLISE / DEMAIS AÇÕES: Análise técnica em texto no chat com streaming
                 else:
-                    status_box.info("⏳ **Dra. Aninha está analisando os elementos periciais...**")
+                    status_box.info("⏳ Só um momento, Dra Aninha está analisando as informações...")
                     response_stream = client.models.generate_content_stream(
                         model="gemini-3.6-flash",
                         contents=contents,
